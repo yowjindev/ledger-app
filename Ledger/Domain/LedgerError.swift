@@ -1,0 +1,84 @@
+import Foundation
+
+/// Errors raised by `LedgerService`. Messages are user-facing and never include balances.
+enum LedgerError: Error, Equatable, Sendable {
+    case amountNotPositive
+    case amountTooLarge
+    case amountTooPrecise
+    case openingBalanceNegative
+    case balanceBelowRecordedActivity(name: String)
+    case missingAccount
+    case missingDestinationAccount
+    case missingCategory
+    case sameSourceAndDestination
+    case accountNotFound
+    case categoryNotFound
+    case transactionNotFound
+    case accountArchived(name: String)
+    case categoryArchived(name: String)
+    case categoryKindMismatch(expected: CategoryKind)
+    case currencyMismatch
+    case emptyName
+    case nameTooLong(limit: Int)
+    case duplicateName(String)
+    case textTooLong(limit: Int)
+    case accountHasTransactions(name: String)
+    case categoryInUse(name: String)
+    case conflictingRequest
+    case persistenceFailed
+}
+
+extension LedgerError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .amountNotPositive:
+            "Enter an amount greater than zero."
+        case .amountTooLarge:
+            "That amount is too large."
+        case .amountTooPrecise:
+            "Amounts can have at most two decimal places."
+        case .openingBalanceNegative:
+            "An opening balance can't be negative."
+        case .balanceBelowRecordedActivity(let name):
+            "The entries already logged for \(name) don't fit that balance. Check the amount, or review \(name)'s entries in Activity."
+        case .missingAccount:
+            "Choose an account."
+        case .missingDestinationAccount:
+            "Choose the account receiving the transfer."
+        case .missingCategory:
+            "Choose a category."
+        case .sameSourceAndDestination:
+            "Choose two different accounts for a transfer."
+        case .accountNotFound:
+            "That account no longer exists."
+        case .categoryNotFound:
+            "That category no longer exists."
+        case .transactionNotFound:
+            "That transaction no longer exists."
+        case .accountArchived(let name):
+            "\(name) is archived. Unarchive it in Settings to use it again."
+        case .categoryArchived(let name):
+            "\(name) is archived. Unarchive it in Settings to use it again."
+        case .categoryKindMismatch(let expected):
+            expected == .expense ? "Choose an expense category." : "Choose an income source."
+        case .currencyMismatch:
+            "These accounts use different currencies."
+        case .emptyName:
+            "Enter a name."
+        case .nameTooLong(let limit):
+            "Names can be at most \(limit) characters."
+        case .duplicateName(let name):
+            "“\(name)” is already in use."
+        case .textTooLong(let limit):
+            "Keep this under \(limit) characters."
+        case .accountHasTransactions(let name):
+            "\(name) has transactions, so it can't be deleted. Archive it instead."
+        case .categoryInUse(let name):
+            "\(name) is used by transactions, so it can't be deleted. Archive it instead."
+        case .conflictingRequest:
+            "This entry conflicts with one that was already saved."
+        case .persistenceFailed:
+            "Ledger couldn't save. No changes were made."
+        }
+    }
+}
