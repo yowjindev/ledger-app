@@ -6,6 +6,7 @@ enum LedgerError: Error, Equatable, Sendable {
     case amountTooLarge
     case amountTooPrecise
     case openingBalanceNegative
+    case balanceNegative
     case balanceBelowRecordedActivity(name: String)
     case missingAccount
     case missingDestinationAccount
@@ -25,6 +26,7 @@ enum LedgerError: Error, Equatable, Sendable {
     case accountHasTransactions(name: String)
     case categoryInUse(name: String)
     case conflictingRequest
+    case entryNotEditable
     case persistenceFailed
 }
 
@@ -39,6 +41,8 @@ extension LedgerError: LocalizedError {
             "Amounts can have at most two decimal places."
         case .openingBalanceNegative:
             "An opening balance can't be negative."
+        case .balanceNegative:
+            "A balance can't be negative."
         case .balanceBelowRecordedActivity(let name):
             "The entries already logged for \(name) don't fit that balance. Check the amount, or review \(name)'s entries in Activity."
         case .missingAccount:
@@ -77,6 +81,8 @@ extension LedgerError: LocalizedError {
             "\(name) is used by transactions, so it can't be deleted. Archive it instead."
         case .conflictingRequest:
             "This entry conflicts with one that was already saved."
+        case .entryNotEditable:
+            "Ledger keeps this entry as it is. Use Update Balance to correct a balance."
         case .persistenceFailed:
             "Ledger couldn't save. No changes were made."
         }

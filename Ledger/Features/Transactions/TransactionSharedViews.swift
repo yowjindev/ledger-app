@@ -66,7 +66,7 @@ struct AddTransactionMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(TransactionKind.allCases) { kind in
+            ForEach(TransactionKind.loggable) { kind in
                 Button(kind.title, systemImage: kind.systemImage) {
                     router.addTransaction(kind)
                 }
@@ -86,6 +86,7 @@ enum TransactionLogging {
         switch kind {
         case .expense, .income: activeAccountCount >= 1
         case .transfer: activeAccountCount >= 2
+        case .adjustment: false
         }
     }
 

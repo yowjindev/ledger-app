@@ -160,7 +160,7 @@ extension LedgerService {
 
     /// The opening balance, in minor units, that makes `currentBalance` the account's current
     /// balance given the activity already recorded for it.
-    private func openingBalanceMinorUnits(forCurrentBalance currentBalance: Decimal, of account: Account, activity: Money?) throws -> Int64 {
+    func openingBalanceMinorUnits(forCurrentBalance currentBalance: Decimal, of account: Account, activity: Money?) throws -> Int64 {
         _ = try AmountRules.openingBalanceMinorUnits(currentBalance, currency: account.currency)
         let opening = currentBalance - (activity?.amount ?? .zero)
         guard opening >= .zero else { throw LedgerError.balanceBelowRecordedActivity(name: account.name) }

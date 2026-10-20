@@ -61,6 +61,8 @@ struct TransactionEditorForm: Equatable, Sendable {
                 note: note,
                 reference: reference
             )
+        case .adjustment:
+            return nil
         }
     }
 }

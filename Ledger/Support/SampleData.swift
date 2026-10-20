@@ -48,6 +48,8 @@ enum SampleData {
                     if let destination = accounts[other] {
                         try ledger.recordTransfer(amount: amount, fromAccountID: account.id, toAccountID: destination.id, occurredAt: hoursAgo(age))
                     }
+                case .adjustment:
+                    break
                 }
             }
         } catch {

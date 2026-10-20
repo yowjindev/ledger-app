@@ -24,4 +24,10 @@ extension LedgerTransaction {
     var origin: EntryOrigin { EntryOrigin(rawValue: originRaw) ?? .app }
     var currency: CurrencyCode { CurrencyCode(rawValue: currencyCode) }
     var amount: Money { Money(minorUnits: amountMinor, currency: currency) }
+    /// Whether an adjustment raised or lowered the balance; `nil` for other kinds.
+    var adjustmentDirection: AdjustmentDirection? { directionRaw.flatMap(AdjustmentDirection.init) }
+
+    /// Whether the transaction editor may change this entry. Adjustments are corrected with
+    /// another Update Balance instead.
+    var isEditable: Bool { kind != .adjustment }
 }

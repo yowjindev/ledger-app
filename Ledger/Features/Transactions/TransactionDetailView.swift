@@ -96,7 +96,7 @@ struct TransactionDetailView: View {
                 case .transfer:
                     accountRow("From", account: details.account)
                     accountRow("To", account: details.destination)
-                case nil:
+                case .adjustment, nil:
                     accountRow("Account", account: details.account)
                 }
             }

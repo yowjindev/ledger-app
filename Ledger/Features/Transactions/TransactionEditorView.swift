@@ -100,7 +100,7 @@ struct TransactionEditorView: View {
         Form {
             Section {
                 Picker("Type", selection: kindSelection) {
-                    ForEach(TransactionKind.allCases) { kind in
+                    ForEach(TransactionKind.loggable) { kind in
                         Text(kind.title).tag(kind)
                     }
                 }
@@ -273,6 +273,7 @@ struct TransactionEditorView: View {
             case .expense: "New Expense"
             case .income: "New Income"
             case .transfer: "New Transfer"
+            case .adjustment: "Edit Transaction"
             }
         case .edit:
             "Edit Transaction"

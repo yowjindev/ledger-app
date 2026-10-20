@@ -8,6 +8,11 @@ enum TransactionKind: String, CaseIterable, Codable, Sendable, Identifiable {
     case income
     /// Money moving between two of the user's accounts. Neither income nor expense.
     case transfer
+    /// A correction that brings an account to its real balance. Neither income nor expense.
+    case adjustment
+
+    /// The kinds a person logs; adjustments are made through Update Balance instead.
+    static let loggable: [TransactionKind] = [.expense, .income, .transfer]
 
     var id: String { rawValue }
 
@@ -16,6 +21,7 @@ enum TransactionKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .expense: "Expense"
         case .income: "Income"
         case .transfer: "Transfer"
+        case .adjustment: "Adjustment"
         }
     }
 
@@ -24,17 +30,24 @@ enum TransactionKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .expense: "arrow.up.right"
         case .income: "arrow.down.left"
         case .transfer: "arrow.left.arrow.right"
+        case .adjustment: "plus.forwardslash.minus"
         }
     }
 
-    /// The category kind this transaction must reference, or `nil` for transfers.
+    /// The category kind this transaction must reference, or `nil` for transfers and adjustments.
     var requiredCategoryKind: CategoryKind? {
         switch self {
         case .expense: .expense
         case .income: .income
-        case .transfer: nil
+        case .transfer, .adjustment: nil
         }
     }
+}
+
+/// Whether a balance adjustment raised or lowered the account's balance.
+enum AdjustmentDirection: String, Codable, Sendable {
+    case increase
+    case decrease
 }
 
 /// Which transactions a category can classify.

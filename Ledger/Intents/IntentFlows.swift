@@ -313,6 +313,9 @@ enum IntentFlows {
                     try await confirm((notes + ["Save it?"]).joined(separator: " "), .log)
                 }
             }
+        case .adjustment:
+            // `resolve` refuses adjustments, so they never reach this point.
+            break
         }
 
         let transaction = try IntentLedger.perform {
