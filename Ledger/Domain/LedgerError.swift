@@ -27,6 +27,9 @@ enum LedgerError: Error, Equatable, Sendable {
     case categoryInUse(name: String)
     case conflictingRequest
     case entryNotEditable
+    case interestRateOutOfRange
+    case taxRateOutOfRange
+    case rateTooPrecise
     case persistenceFailed
 }
 
@@ -83,6 +86,12 @@ extension LedgerError: LocalizedError {
             "This entry conflicts with one that was already saved."
         case .entryNotEditable:
             "Ledger keeps this entry as it is. Use Update Balance to correct a balance."
+        case .interestRateOutOfRange:
+            "Enter an interest rate above 0% and up to 100%."
+        case .taxRateOutOfRange:
+            "Enter a tax rate from 0% to 100%."
+        case .rateTooPrecise:
+            "Rates can have at most four decimal places."
         case .persistenceFailed:
             "Ledger couldn't save. No changes were made."
         }
