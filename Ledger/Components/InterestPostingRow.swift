@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// One day's automatic interest in a list, net of withholding tax.
+/// One day's automatic interest in a list, net of withholding tax, or the part of it a filter shows.
 struct InterestPostingRow: View {
     let posting: InterestPosting
     /// Show the date as well as the time (for lists that aren't grouped by day).
@@ -12,13 +12,13 @@ struct InterestPostingRow: View {
     var body: some View {
         HistoryRowLayout(
             symbolName: TransactionSummary.interestSymbolName,
-            tint: LedgerTheme.income,
-            title: TransactionSummary.interestTitle,
+            tint: LedgerTheme.badgeTint(for: posting.includesInterest ? .income : .expense),
+            title: posting.title,
             accountLine: posting.accountLine,
             occurredAt: posting.postedAt,
             amountText: posting.signedNetText(formatter: formatter),
             amountColor: posting.net.isNegative ? .primary : LedgerTheme.income,
-            caption: "After tax",
+            caption: posting.caption,
             accessibilityLabel: posting.accessibilityLabel(formatter: formatter),
             showsDate: showsDate
         )

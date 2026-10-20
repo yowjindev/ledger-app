@@ -84,6 +84,26 @@ final class InterestHistoryTests: XCTestCase {
         XCTAssertEqual(try posting(items[1]).net, Money(-(dec("0.72") + dec("0.45"))))
     }
 
+    func testPartialPostingsAreLabelledByWhatTheyHold() throws {
+        let f = try fixture()
+        let formatter = fixedFormatter()
+        let history = try f.h.ledger.transactions(involving: f.savings)
+
+        let whole = try posting(HistoryItem.items(from: history).first)
+        XCTAssertEqual(whole.title, "Interest")
+        XCTAssertEqual(whole.caption, "After tax")
+
+        let interestOnly = try posting(HistoryItem.items(from: history.filter { $0.kind == .income }).first)
+        XCTAssertEqual(interestOnly.title, "Interest")
+        XCTAssertEqual(interestOnly.caption, "Income", "Gross interest is never called after tax")
+        XCTAssertTrue(plainSpaces(interestOnly.accessibilityLabel(formatter: formatter)).hasPrefix("Interest, +₱3.62, Savings, "))
+
+        let taxOnly = try posting(HistoryItem.items(from: history.filter { $0.kind == .expense }).first)
+        XCTAssertEqual(taxOnly.title, "Withholding tax")
+        XCTAssertEqual(taxOnly.caption, "Expense")
+        XCTAssertTrue(plainSpaces(taxOnly.accessibilityLabel(formatter: formatter)).hasPrefix("Withholding tax, -₱0.72, Savings, "))
+    }
+
     func testDifferentDaysStaySeparate() throws {
         let f = try fixture()
         f.h.clock.now = try instant("2026-03-16T17:00:00Z")

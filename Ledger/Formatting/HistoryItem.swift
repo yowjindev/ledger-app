@@ -55,6 +55,9 @@ struct InterestPosting: Identifiable {
     let accountNames: [String]
     /// Each credited account's figures, in display order.
     let breakdown: [AccountInterest]
+    /// Whether `entries` hold interest, and withholding tax; a filtered list may hold only one.
+    let includesInterest: Bool
+    let includesTax: Bool
 
     var id: Date { postedAt }
 
@@ -67,6 +70,8 @@ struct InterestPosting: Identifiable {
             entry.kind == .expense ? sum - entry.amount.amount : sum + entry.amount.amount
         }
         net = Money(total, currency: currency)
+        includesInterest = entries.contains { $0.kind == .income }
+        includesTax = entries.contains { $0.kind == .expense }
 
         let byAccount = Dictionary(grouping: entries.filter { $0.account != nil }) { $0.account?.id }
         breakdown = byAccount.values.compactMap(AccountInterest.init).sorted {
@@ -79,6 +84,17 @@ struct InterestPosting: Identifiable {
     func breakdown(for accountID: UUID?) -> [AccountInterest] {
         guard let accountID else { return breakdown }
         return breakdown.filter { $0.accountID == accountID }
+    }
+
+    /// "Interest", or "Withholding tax" when only tax entries are shown.
+    var title: String {
+        includesInterest ? TransactionSummary.interestTitle : TransactionSummary.withholdingTaxTitle
+    }
+
+    /// "After tax" when both interest and tax are shown, otherwise the kind of entries shown.
+    var caption: String {
+        if includesInterest && includesTax { return "After tax" }
+        return includesInterest ? TransactionKind.income.title : TransactionKind.expense.title
     }
 
     /// "Savings", or "2 accounts".
@@ -94,7 +110,8 @@ struct InterestPosting: Identifiable {
     /// Spoken description, for example "Interest after tax, +₱2.90, Savings, October 20, 2026 at 1:00 AM".
     func accessibilityLabel(formatter: MoneyFormatter) -> String {
         let amount = formatter.string(net, sign: .always, alwaysShowCentavos: true)
-        return "\(TransactionSummary.interestTitle) after tax, \(amount), \(accountLine), \(postedAt.formatted(date: .long, time: .shortened))"
+        let title = includesInterest && includesTax ? "\(self.title) after tax" : self.title
+        return "\(title), \(amount), \(accountLine), \(postedAt.formatted(date: .long, time: .shortened))"
     }
 }
 
