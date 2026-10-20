@@ -176,6 +176,24 @@ final class InterestPostingTests: XCTestCase {
         XCTAssertEqual(savings.interestPaidThrough, 20_260_316)
     }
 
+    func testChangingTheDeviceCalendarNeverReplaysOrStopsInterest() throws {
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Manila"))
+        let h = try LedgerHarness(calendar: buddhist)
+        let savings = try h.account("Savings", opening: 40_000)
+        try h.ledger.setInterest(terms, for: savings)
+        XCTAssertEqual(savings.interestPaidThrough, 20_260_314)
+        try setNow(h, "2026-03-15T17:00:00Z")
+        XCTAssertEqual(try h.ledger.postDueInterest(), 2)
+
+        let gregorian = LedgerService(context: h.context, clock: { [clock = h.clock] in clock.now }, calendar: try fixedCalendar("Asia/Manila"))
+        try setNow(h, "2026-03-16T17:00:00Z")
+
+        XCTAssertEqual(try gregorian.postDueInterest(), 2, "Only March 16")
+        XCTAssertEqual(savings.interestPaidThrough, 20_260_316)
+        XCTAssertEqual(try interestEntries(h).filter { $0.kind == .income }.map(\.basisMinor), [4_000_000, 4_000_290])
+    }
+
     // MARK: Changing settings
 
     func testTurningOnStartsWithToday() throws {

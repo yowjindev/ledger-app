@@ -91,6 +91,23 @@ final class InterestCalculatorTests: XCTestCase {
         XCTAssertLessThan(day, CalendarDay(year: 2026, month: 3, day: 16))
     }
 
+    func testCalendarDaysAreGregorianWhateverTheDeviceCalendar() throws {
+        let identifiers: [Calendar.Identifier] = [.buddhist, .japanese, .persian, .islamicUmmAlQura, .hebrew]
+        for identifier in identifiers {
+            var calendar = Calendar(identifier: identifier)
+            calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Asia/Manila"))
+            let label = "\(identifier)"
+            XCTAssertEqual(CalendarDay(containing: try instant("2026-03-15T16:30:00Z"), calendar: calendar), CalendarDay(year: 2026, month: 3, day: 16), label)
+            XCTAssertEqual(CalendarDay(year: 2026, month: 3, day: 16).start(in: calendar), try instant("2026-03-15T16:00:00Z"), label)
+            XCTAssertEqual(CalendarDay(year: 2026, month: 2, day: 28).adding(days: 1, calendar: calendar), CalendarDay(year: 2026, month: 3, day: 1), label)
+            XCTAssertEqual(
+                InterestCalculator.lastPostableDay(asOf: try instant("2026-03-15T17:00:00Z"), calendar: calendar),
+                CalendarDay(year: 2026, month: 3, day: 15),
+                label
+            )
+        }
+    }
+
     // MARK: Rates
 
     func testRateParsingAcceptsLocaleAndPercentSign() {
