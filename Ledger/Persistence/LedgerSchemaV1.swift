@@ -152,14 +152,3 @@ enum LedgerSchemaV1: VersionedSchema {
         }
     }
 }
-
-/// Migration plan for the persisted schema. New versions append a schema and a stage here;
-/// existing financial records must always be carried forward, never dropped.
-enum LedgerMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [LedgerSchemaV1.self] }
-    static var stages: [MigrationStage] { [] }
-}
-
-typealias Account = LedgerSchemaV1.Account
-typealias LedgerCategory = LedgerSchemaV1.LedgerCategory
-typealias LedgerTransaction = LedgerSchemaV1.LedgerTransaction
