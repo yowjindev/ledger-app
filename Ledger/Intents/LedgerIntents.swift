@@ -225,11 +225,11 @@ struct LogFromMessageIntent: AppIntent {
     }
 }
 
-/// One shortcut for the Action Button: choose Expense, Income, Transfer, or Check Balances,
-/// then continue with that flow.
+/// One shortcut for the Action Button: choose Expense, Income, Transfer, Check Balances, or
+/// Update Balance, then continue with that flow.
 struct LedgerMenuIntent: AppIntent {
     static let title: LocalizedStringResource = "Ledger Menu"
-    static let description = IntentDescription("Choose to log an expense, income, or a transfer, or check your balances.")
+    static let description = IntentDescription("Choose to log an expense, income, or a transfer, check your balances, or update a balance.")
     static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Action", requestValueDialog: "What would you like to do?")
@@ -267,6 +267,11 @@ struct LedgerMenuIntent: AppIntent {
             }
             Case(.transfer) {
                 Summary("\(\.$action) \(\.$amount) from \(\.$account) to \(\.$destinationAccount)") {
+                    \.$resultRow
+                }
+            }
+            Case(.updateBalance) {
+                Summary("\(\.$action) of \(\.$account) to \(\.$amount)") {
                     \.$resultRow
                 }
             }
@@ -330,6 +335,15 @@ struct LedgerMenuIntent: AppIntent {
             )
         case .balances:
             outcome = try IntentFlows.balances(in: ledger)
+        case .updateBalance:
+            outcome = try await IntentFlows.updateBalance(
+                in: ledger,
+                account: account,
+                amount: amount,
+                askAccount: { try await $account.requestValue(.plain($0)) },
+                askAmount: { try await $amount.requestValue(.plain($0)) },
+                confirm: confirm
+            )
         }
         await ResultList.show(outcome) { _ = try await $resultRow.requestValue($0) }
         return .result()
