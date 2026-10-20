@@ -33,8 +33,13 @@ struct TransactionListView: View {
             }
             ForEach(TransactionDay.group(matches)) { day in
                 Section(TransactionDay.title(for: day.date, now: now)) {
-                    ForEach(day.transactions) { transaction in
-                        row(for: transaction)
+                    ForEach(HistoryItem.items(from: day.transactions)) { item in
+                        switch item {
+                        case .transaction(let transaction):
+                            row(for: transaction)
+                        case .interest:
+                            HistoryItemLink(item: item, accountID: filter.accountID)
+                        }
                     }
                 }
             }

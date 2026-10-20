@@ -4,7 +4,7 @@ import SwiftUI
 /// One account: its current balance and how it's derived, its transactions, and account actions.
 /// Looks the account up by ID, so it copes with the account being deleted elsewhere.
 struct AccountDetailView: View {
-    /// Transactions listed here before linking to the full history.
+    /// History rows listed here before linking to the full history.
     static let recentTransactionLimit = 50
 
     let accountID: UUID
@@ -190,17 +190,16 @@ struct AccountDetailView: View {
     }
 
     private func transactionsSection(_ history: [LedgerTransaction]) -> some View {
-        Section {
-            if history.isEmpty {
+        let items = HistoryItem.items(from: history)
+        return Section {
+            if items.isEmpty {
                 Text("No transactions yet")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(history.prefix(Self.recentTransactionLimit)) { transaction in
-                    NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-                        TransactionRow(transaction: transaction, showsDate: true)
-                    }
+                ForEach(items.prefix(Self.recentTransactionLimit)) { item in
+                    HistoryItemLink(item: item, showsDate: true, accountID: accountID)
                 }
-                if history.count > Self.recentTransactionLimit {
+                if items.count > Self.recentTransactionLimit {
                     NavigationLink {
                         AccountTransactionsView(accountID: accountID)
                     } label: {
@@ -209,7 +208,7 @@ struct AccountDetailView: View {
                 }
             }
         } header: {
-            Text(history.count > Self.recentTransactionLimit ? "Latest Transactions" : "Transactions")
+            Text(items.count > Self.recentTransactionLimit ? "Latest Transactions" : "Transactions")
         }
     }
 
