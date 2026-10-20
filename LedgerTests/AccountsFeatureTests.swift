@@ -6,6 +6,22 @@ import XCTest
 /// The liquid total completeness note and first-run account setup.
 @MainActor
 final class AccountsFeatureTests: XCTestCase {
+    // MARK: Interest
+
+    func testInterestSummaryCopy() {
+        let us = Locale(identifier: "en_US")
+        func terms(_ rate: Int64, _ tax: Int64) -> InterestTerms {
+            InterestTerms(annualRate: Rate(partsPerMillion: rate), taxRate: Rate(partsPerMillion: tax))
+        }
+
+        XCTAssertEqual(AccountsCopy.interestSummary(nil, locale: us), "Off")
+        XCTAssertEqual(AccountsCopy.interestSummary(terms(32_500, 200_000), locale: us), "3.25% a year, 20% tax")
+        XCTAssertEqual(AccountsCopy.interestSummary(terms(40_000, 200_000), locale: us), "4% a year, 20% tax")
+        XCTAssertEqual(AccountsCopy.interestSummary(terms(32_500, 0), locale: us), "3.25% a year, no tax")
+        XCTAssertEqual(AccountsCopy.interestSummary(terms(31_250, 125_000), locale: Locale(identifier: "de_DE")), "3,125% a year, 12,5% tax")
+        XCTAssertTrue(AccountsCopy.interestFooter.contains("÷ 360, rounded up"))
+    }
+
     // MARK: Update Balance
 
     func testCorrectionPreviewCopy() {

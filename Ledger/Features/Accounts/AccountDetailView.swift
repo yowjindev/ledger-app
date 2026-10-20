@@ -17,6 +17,7 @@ struct AccountDetailView: View {
     @Query(sort: LedgerService.newestFirst) private var transactions: [LedgerTransaction]
     @State private var editor: AccountEditorPresentation?
     @State private var isUpdatingBalance = false
+    @State private var isEditingInterest = false
     @State private var isConfirmingArchive = false
     @State private var isConfirmingDelete = false
     /// Set once this screen deleted the account, while it closes.
@@ -53,6 +54,9 @@ struct AccountDetailView: View {
                 header(balance)
             }
             breakdownSection(balance)
+            if !account.isArchived {
+                interestSection(account)
+            }
             transactionsSection(history)
             actionsSection(account: account, balance: balance, hasTransactions: !history.isEmpty)
         }
@@ -70,6 +74,9 @@ struct AccountDetailView: View {
         }
         .sheet(isPresented: $isUpdatingBalance) {
             UpdateBalanceView(account: account)
+        }
+        .sheet(isPresented: $isEditingInterest) {
+            AccountInterestEditorView(account: account)
         }
         .ledgerAlert($alert)
     }
@@ -160,6 +167,25 @@ struct AccountDetailView: View {
             Text("Breakdown")
         } footer: {
             Text(AccountsCopy.balanceFormula)
+        }
+    }
+
+    private func interestSection(_ account: Account) -> some View {
+        Section {
+            Button {
+                isEditingInterest = true
+            } label: {
+                LabeledContent {
+                    Text(AccountsCopy.interestSummary(account.interestTerms))
+                } label: {
+                    Label("Interest", systemImage: TransactionSummary.interestSymbolName)
+                }
+            }
+            .tint(.primary)
+        } footer: {
+            if account.interestTerms != nil {
+                Text(AccountsCopy.interestFooter)
+            }
         }
     }
 
