@@ -196,4 +196,13 @@ final class BalanceAdjustmentTests: XCTestCase {
         XCTAssertEqual(TransactionKind.loggable, [.expense, .income, .transfer])
         XCTAssertFalse(TransactionLogging.canLog(.adjustment, activeAccountCount: 5))
     }
+
+    func testDebugEditorArgumentOpensOnlyLoggableKinds() throws {
+        try withScratchDefaults { defaults in
+            defaults.set("adjustment", forKey: "LedgerOpenEditor")
+            XCTAssertNil(AppLaunchConfiguration.resolve(environment: [:], defaults: defaults).initialEditorKind)
+            defaults.set("income", forKey: "LedgerOpenEditor")
+            XCTAssertEqual(AppLaunchConfiguration.resolve(environment: [:], defaults: defaults).initialEditorKind, .income)
+        }
+    }
 }

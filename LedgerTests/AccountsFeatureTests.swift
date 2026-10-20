@@ -6,6 +6,21 @@ import XCTest
 /// The liquid total completeness note and first-run account setup.
 @MainActor
 final class AccountsFeatureTests: XCTestCase {
+    // MARK: Update Balance
+
+    func testCorrectionPreviewCopy() {
+        let formatter = fixedFormatter()
+        func preview(_ correction: BalanceCorrection) -> String {
+            plainSpaces(AccountsCopy.correctionPreview(correction, accountName: "GCash", formatter: formatter))
+        }
+
+        XCTAssertEqual(preview(.adjustment(Money(4))), "Ledger will add a balance adjustment of +₱4.00.")
+        XCTAssertEqual(preview(.adjustment(Money(-7))), "Ledger will add a balance adjustment of -₱7.00.")
+        XCTAssertEqual(preview(.setOpeningBalance(Money(71))), "Ledger will set GCash's opening balance to ₱71.00.")
+        XCTAssertEqual(preview(.alreadyMatches), "This matches Ledger's balance. Nothing will change.")
+        XCTAssertTrue(AccountsCopy.balanceFormula.hasSuffix("− transfers out ± adjustments."))
+    }
+
     // MARK: Completeness note
 
     func testCompleteTotalHasNoNote() throws {

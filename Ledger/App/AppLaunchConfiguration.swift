@@ -37,7 +37,9 @@ struct AppLaunchConfiguration: Sendable {
             loadsSampleData: inMemory && !isUnitTesting && defaults.bool(forKey: "LedgerSampleData"),
             skipsOnboarding: isUnitTesting || defaults.bool(forKey: "LedgerSkipOnboarding"),
             initialTab: defaults.string(forKey: "LedgerInitialTab").flatMap(AppTab.init(rawValue:)),
-            initialEditorKind: defaults.string(forKey: "LedgerOpenEditor").flatMap(TransactionKind.init(rawValue:))
+            initialEditorKind: defaults.string(forKey: "LedgerOpenEditor")
+                .flatMap(TransactionKind.init(rawValue:))
+                .flatMap { TransactionKind.loggable.contains($0) ? $0 : nil }
         )
         #else
         return AppLaunchConfiguration(

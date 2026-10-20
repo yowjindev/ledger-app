@@ -16,6 +16,7 @@ struct AccountDetailView: View {
     @Query private var matches: [Account]
     @Query(sort: LedgerService.newestFirst) private var transactions: [LedgerTransaction]
     @State private var editor: AccountEditorPresentation?
+    @State private var isUpdatingBalance = false
     @State private var isConfirmingArchive = false
     @State private var isConfirmingDelete = false
     /// Set once this screen deleted the account, while it closes.
@@ -66,6 +67,9 @@ struct AccountDetailView: View {
         }
         .sheet(item: $editor) { presentation in
             AccountEditorView(account: account, initialFocus: presentation.focus)
+        }
+        .sheet(isPresented: $isUpdatingBalance) {
+            UpdateBalanceView(account: account)
         }
         .ledgerAlert($alert)
     }
@@ -141,6 +145,7 @@ struct AccountDetailView: View {
             LabeledContent("Transfers In") { signedAmount(balance.transfersIn) }
             LabeledContent("Expenses") { signedAmount(-balance.expenses) }
             LabeledContent("Transfers Out") { signedAmount(-balance.transfersOut) }
+            LabeledContent("Adjustments") { signedAmount(balance.adjustments) }
             LabeledContent("Net Activity") { signedAmount(balance.netActivity) }
             LabeledContent("Current Balance") {
                 if let current = balance.currentBalance {
@@ -189,6 +194,9 @@ struct AccountDetailView: View {
                     unarchive(account)
                 }
             } else {
+                Button("Update Balance", systemImage: "plus.forwardslash.minus") {
+                    isUpdatingBalance = true
+                }
                 Button("Add Transaction", systemImage: "plus.circle") {
                     router.addTransaction(.expense, accountID: accountID)
                 }

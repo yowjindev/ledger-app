@@ -46,7 +46,7 @@ struct TransactionDetailView: View {
         .navigationTitle((current ?? lastShown)?.summary.kind?.title ?? "Transaction")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let live {
+            if let live, live.isEditable {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") {
                         router.edit(live)

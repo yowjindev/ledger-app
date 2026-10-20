@@ -93,16 +93,20 @@ struct TransactionListView: View {
                 Label("Delete", systemImage: "trash")
             }
             .tint(.red)
-            Button {
-                router.edit(transaction)
-            } label: {
-                Label("Edit", systemImage: "pencil")
+            if transaction.isEditable {
+                Button {
+                    router.edit(transaction)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                .tint(.accentColor)
             }
-            .tint(.accentColor)
         }
         .contextMenu {
-            Button("Edit", systemImage: "pencil") {
-                router.edit(transaction)
+            if transaction.isEditable {
+                Button("Edit", systemImage: "pencil") {
+                    router.edit(transaction)
+                }
             }
             Button("Delete", systemImage: "trash", role: .destructive) {
                 requestDeletion(of: transaction)
