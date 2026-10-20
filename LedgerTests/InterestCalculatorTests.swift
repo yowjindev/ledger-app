@@ -104,6 +104,23 @@ final class InterestCalculatorTests: XCTestCase {
         XCTAssertNil(Rate.parse("%", locale: us))
     }
 
+    func testRatesRoundTripThroughEditableText() throws {
+        let us = Locale(identifier: "en_US"), fr = Locale(identifier: "fr_FR")
+        XCTAssertEqual(Rate(partsPerMillion: 31_250).editableText(locale: us), "3.125")
+        XCTAssertEqual(Rate(partsPerMillion: 625).editableText(locale: us), "0.0625")
+        XCTAssertEqual(Rate(partsPerMillion: 31_250).editableText(locale: fr), "3,125")
+        XCTAssertEqual(Rate(partsPerMillion: 200_000).editableText(locale: us), "20")
+        for ppm: Int64 in [31_250, 625, 32_500, 1, 1_000_000] {
+            for locale in [us, fr] {
+                let text = Rate(partsPerMillion: ppm).editableText(locale: locale)
+                let sanitized = AmountParser.sanitize(text, locale: locale, maximumFractionDigits: RateRules.maximumFractionDigits, maximumIntegerDigits: 3)
+                XCTAssertEqual(sanitized, text, "The editor keeps the text it was given")
+                let percent = try XCTUnwrap(Rate.parse(sanitized, locale: locale))
+                XCTAssertEqual(try RateRules.annualRate(percent: percent).partsPerMillion, ppm)
+            }
+        }
+    }
+
     func testRateRules() throws {
         assertThrowsLedgerError(.interestRateOutOfRange) { try RateRules.annualRate(percent: 0) }
         assertThrowsLedgerError(.interestRateOutOfRange) { try RateRules.annualRate(percent: dec("100.0001")) }

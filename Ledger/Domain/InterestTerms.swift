@@ -10,6 +10,12 @@ struct Rate: Hashable, Sendable {
     /// The rate as a fraction, for example 0.0325.
     var fraction: Decimal { Decimal(partsPerMillion) / 1_000_000 }
 
+    /// The percentage as text for editing, with every decimal place a rate can have, so it
+    /// reads back as the same rate.
+    func editableText(locale: Locale = .autoupdatingCurrent) -> String {
+        AmountParser.editableText(for: percent, locale: locale, maximumFractionDigits: RateRules.maximumFractionDigits)
+    }
+
     /// Reads a typed percentage such as "3.25", "3,25" where the comma is the decimal separator,
     /// or "3.25%". Returns `nil` when the text isn't a number.
     static func parse(_ text: String, locale: Locale = .autoupdatingCurrent) -> Decimal? {

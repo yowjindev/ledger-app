@@ -28,8 +28,8 @@ struct AccountInterestEditorView: View {
     init(account: Account) {
         self.account = account
         let terms = account.interestTerms
-        let rateText = terms.map { AmountParser.editableText(for: $0.annualRate.percent) } ?? ""
-        let taxText = AmountParser.editableText(for: (terms?.taxRate ?? InterestTerms.defaultTaxRate).percent)
+        let rateText = terms?.annualRate.editableText() ?? ""
+        let taxText = (terms?.taxRate ?? InterestTerms.defaultTaxRate).editableText()
         savedEarnsInterest = terms != nil
         savedRateText = rateText
         savedTaxText = taxText
