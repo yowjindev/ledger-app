@@ -4,6 +4,9 @@ import Foundation
 struct TransactionSummary: Identifiable, Hashable, Sendable {
     static let unknownAccount = "Unknown account"
     static let adjustmentTitle = "Balance adjustment"
+    static let interestTitle = "Interest"
+    static let withholdingTaxTitle = "Withholding tax"
+    static let interestSymbolName = "percent"
 
     let id: UUID
     /// `nil` for records whose kind this app version doesn't know.
@@ -36,6 +39,10 @@ struct TransactionSummary: Identifiable, Hashable, Sendable {
         case .adjustment:
             title = Self.adjustmentTitle
             symbolName = TransactionKind.adjustment.systemImage
+            accountLine = sourceName
+        case .expense where transaction.origin == .interest, .income where transaction.origin == .interest:
+            title = transaction.kind == .income ? Self.interestTitle : Self.withholdingTaxTitle
+            symbolName = Self.interestSymbolName
             accountLine = sourceName
         case .expense, .income:
             let categoryKind = transaction.category?.kind ?? (transaction.kind == .income ? .income : .expense)

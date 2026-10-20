@@ -32,9 +32,11 @@ extension LedgerService {
     }
 
     /// Brings an account to its real balance in one save: sets the opening balance when it isn't
-    /// known yet, otherwise records one adjustment for the difference. Returns what it did.
+    /// known yet, otherwise records one adjustment for the difference. Interest already due is
+    /// posted first, so the difference is measured against an up-to-date balance. Returns what it did.
     @discardableResult
     func updateBalance(of account: Account, to actual: Decimal, origin: EntryOrigin = .app) throws -> BalanceCorrection {
+        try postDueInterest()
         let correction = try balanceCorrection(toReach: actual, for: account)
         switch correction {
         case .alreadyMatches:

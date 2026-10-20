@@ -78,12 +78,18 @@ extension LedgerService {
         try commit()
     }
 
-    /// Hides an account from pickers and the liquid total. Its transactions stay in history and
-    /// keep affecting the other accounts they involve.
+    /// Hides an account from pickers and the liquid total, and stops its interest after posting
+    /// the days already due. Its transactions stay in history and keep affecting the other
+    /// accounts they involve.
     func archiveAccount(_ account: Account) throws {
         guard !account.isArchived else { return }
+        if account.interestTerms != nil {
+            try postDueInterest()
+        }
         account.isArchived = true
         account.archivedAt = now
+        account.interestRatePPM = nil
+        account.interestPaidThrough = nil
         try commit()
         Log.ledger.info("Archived an account")
     }

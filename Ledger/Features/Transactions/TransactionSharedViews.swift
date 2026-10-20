@@ -104,6 +104,7 @@ enum TransactionLogging {
         switch origin {
         case .app: "Ledger app"
         case .appIntent: "Shortcuts, Siri, or Action Button"
+        case .interest: "Added by Ledger"
         }
     }
 }

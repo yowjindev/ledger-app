@@ -17,18 +17,23 @@ struct LedgerService {
     static let referenceLengthLimit = 100
 
     let context: ModelContext
+    /// The calendar and time zone that decide where one day ends and the next begins.
+    let calendar: Calendar
     private let clock: () -> Date
     private let persist: (ModelContext) throws -> Void
 
     /// - Parameters:
     ///   - clock: Supplies the current time; injectable for deterministic tests.
+    ///   - calendar: Defines days for daily interest; injectable for deterministic tests.
     ///   - persist: Saves the context; injectable to simulate storage failures in tests.
     init(
         context: ModelContext,
         clock: @escaping () -> Date = { Date.now },
+        calendar: Calendar = .current,
         persist: @escaping (ModelContext) throws -> Void = { try $0.save() }
     ) {
         self.context = context
+        self.calendar = calendar
         self.clock = clock
         self.persist = persist
     }

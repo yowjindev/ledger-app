@@ -136,4 +136,6 @@ enum EntryOrigin: String, Codable, Sendable {
     case app
     /// Entered through an App Intent: Shortcuts, Siri, Spotlight, or the Action Button.
     case appIntent
+    /// Posted by Ledger: daily interest and its withholding tax.
+    case interest
 }
