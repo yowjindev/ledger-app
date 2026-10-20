@@ -60,6 +60,14 @@ _Last updated: 2026-10-13_
 - **Opening balances:** `nil` means "not set" and is never treated as ₱0. Onboarding asks what
   each account holds now and subtracts entries already logged.
 - **Archived accounts:** excluded from the total liquid balance; archiving warns when money remains.
+  Archiving also turns the account's daily interest off.
+- **Balance adjustments:** a separate transaction kind, so they change balances without ever
+  counting as income or spending. Entering a real balance for an account with no opening balance
+  sets the opening balance instead.
+- **Daily interest:** end-of-day balance × annual rate ÷ 360, rounded up; withholding tax (20% by
+  default) rounded to the nearest centavo; both dated 1:00 AM the next day. The formula matched an
+  observed bank credit; ÷ 365 did not. Rates are stored exactly in parts per million. Posted days
+  are tracked as calendar dates, so a time zone change never posts a day twice.
 - **Intents require an unlocked iPhone** (`.requiresAuthentication`), because they read or
   change financial data. To allow logging from a locked phone, change the `authenticationPolicy`
   lines in `Ledger/Intents/LedgerIntents.swift` to `.alwaysAllowed`. That lets anyone holding the
@@ -82,12 +90,21 @@ _Last updated: 2026-10-13_
 4. Try Siri voice input for amounts and names.
 5. Optionally, with a team set on both targets, run the `LedgerShortcutsUITests` scheme on a
    simulator so its skipped tests run in full.
+6. Turn on daily interest for a savings account and compare Ledger's daily interest and tax with
+   the bank's for a few days. If they differ, note the balance, interest and tax the bank showed,
+   so the rounding rule can be adjusted.
 
 If a step fails on the device, look in Console.app for the app's messages in the `intents`
 category.
 
 ## Known limitations
 
+- Daily interest is posted only when Ledger runs, so balances catch up when the app opens or a
+  shortcut runs. The rounding rule is inferred and may differ by a centavo on some days; Update
+  Balance corrects it. A rate change made between midnight and 1:00 AM also covers the day that
+  just ended.
+- Update Balance from the Ledger Menu can't set a balance of exactly ₱0, because Shortcuts sends 0
+  for an empty amount. The app can.
 - Single currency (PHP); no export, import, sync, widgets or Apple Watch app; iPhone only.
 - Search and filtering run in memory, which is fine at personal scale. Tens of thousands of
   records would call for predicate-based queries.
