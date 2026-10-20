@@ -235,7 +235,7 @@ xcodebuild -project Ledger.xcodeproj -scheme Ledger \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-245 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
+249 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
 real data. They cover balances after every kind of change, transfers, edits and deletes, failed
 saves, exact arithmetic, archiving, duplicate protection, unset opening balances, balance
 adjustments, daily interest and its catch-up, the schema migration, amount parsing and formatting,
