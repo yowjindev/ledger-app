@@ -15,6 +15,11 @@ struct DashboardView: View {
     private var accounts: [Account]
     @Query(sort: LedgerService.newestFirst)
     private var transactions: [LedgerTransaction]
+    @Query private var plans: [PaymentPlan]
+    @Query private var bills: [Bill]
+    @Query private var overrides: [DueOverride]
+    @Environment(\.calendar) private var calendar
+    @Environment(\.moneyFormatter) private var formatter
 
     /// The moment the current period is measured from; kept current by `refreshingCurrentDate`.
     @State private var now = Date.now
@@ -48,6 +53,7 @@ struct DashboardView: View {
                         .listRowBackground(Color.clear)
                 }
                 periodSection
+                billsSection(sheet)
             }
 
             accountsSection(sheet.moneyBalances)
@@ -84,6 +90,57 @@ struct DashboardView: View {
             PeriodSummaryRows(summary: summary)
         } header: {
             PeriodHeader(period: $period, interval: summary.interval)
+        }
+    }
+
+    /// What's owed and the next due, when there are owed accounts or bills.
+    @ViewBuilder
+    private func billsSection(_ sheet: BalanceSheet) -> some View {
+        if !sheet.owedBalances.isEmpty || bills.contains(where: { !$0.isArchived }) {
+            let today = CalendarDay(containing: now, calendar: calendar)
+            let dues = LedgerService.comingUp(
+                accounts: accounts, transactions: transactions, plans: plans, bills: bills,
+                overrides: overrides, today: today, calendar: calendar
+            )
+            Section {
+                Button {
+                    router.selectedTab = .bills
+                } label: {
+                    VStack(spacing: 10) {
+                        if !sheet.owedBalances.isEmpty {
+                            LabeledContent("You Owe") {
+                                MoneyText(sheet.totalOwed)
+                                    .foregroundStyle(.primary)
+                            }
+                        }
+                        if let next = dues.first(where: { !$0.isPaid }) {
+                            LabeledContent {
+                                Text(DueStatusCopy.amountText(next, formatter: formatter))
+                                    .monospacedDigit()
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Next Due")
+                                    Text("\(dueName(next)) · \(DueStatusCopy.dateText(next, today: today, calendar: calendar))")
+                                        .font(.subheadline)
+                                        .foregroundStyle(next.isOverdue ? .red : .secondary)
+                                }
+                            }
+                        } else {
+                            LabeledContent("Next Due", value: "All paid")
+                        }
+                    }
+                }
+                .tint(.primary)
+            } header: {
+                Text("Bills")
+            }
+        }
+    }
+
+    private func dueName(_ status: DueStatus) -> String {
+        switch status.owner {
+        case .account(let id): accounts.first { $0.id == id }?.name ?? ""
+        case .bill(let id): bills.first { $0.id == id }?.name ?? ""
         }
     }
 

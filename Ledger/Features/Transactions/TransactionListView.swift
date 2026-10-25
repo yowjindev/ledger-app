@@ -35,8 +35,8 @@ struct TransactionListView: View {
                 Section(TransactionDay.title(for: day.date, now: now)) {
                     ForEach(HistoryItem.items(from: day.transactions)) { item in
                         switch item {
-                        case .transaction(let transaction):
-                            row(for: transaction)
+                        case .transaction(let transaction, let cashback):
+                            row(for: transaction, cashback: cashback)
                         case .interest:
                             HistoryItemLink(item: item, accountID: filter.accountID)
                         }
@@ -86,9 +86,9 @@ struct TransactionListView: View {
 
     // MARK: Rows
 
-    private func row(for transaction: LedgerTransaction) -> some View {
+    private func row(for transaction: LedgerTransaction, cashback: LedgerTransaction?) -> some View {
         NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-            TransactionRow(transaction: transaction)
+            TransactionRow(transaction: transaction, cashback: cashback)
         }
         .swipeActions(edge: .trailing) {
             // No destructive role here: the row stays in place until the deletion is confirmed.

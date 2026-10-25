@@ -1,29 +1,41 @@
 import Foundation
 
-/// One row of transaction history: a transaction, or the automatic interest and tax entries
-/// credited at one moment.
+/// One row of transaction history: a transaction with the cashback it earned, or the automatic
+/// interest and tax entries credited at one moment.
 enum HistoryItem: Identifiable {
-    case transaction(LedgerTransaction)
+    case transaction(LedgerTransaction, cashback: LedgerTransaction? = nil)
     case interest(InterestPosting)
 
     var id: String {
         switch self {
-        case .transaction(let transaction): "transaction-\(transaction.id.uuidString)"
+        case .transaction(let transaction, _): "transaction-\(transaction.id.uuidString)"
         case .interest(let posting): "interest-\(posting.postedAt.timeIntervalSinceReferenceDate)"
         }
     }
 
     /// Keeps the order of `transactions`, replacing every automatic interest or tax entry with one
-    /// `InterestPosting` per moment, placed where its first entry appears.
+    /// `InterestPosting` per moment, placed where its first entry appears. Cashback joins its
+    /// purchase's row when both are listed.
     @MainActor
     static func items(from transactions: [LedgerTransaction]) -> [HistoryItem] {
         enum Slot {
             case transaction(LedgerTransaction)
             case posting(Date)
         }
+        let listedIDs = Set(transactions.map(\.id))
+        var cashbackByPurchase: [UUID: LedgerTransaction] = [:]
+        for transaction in transactions where transaction.origin == .cashback {
+            if let purchaseID = transaction.sourceTransactionID, listedIDs.contains(purchaseID) {
+                cashbackByPurchase[purchaseID] = transaction
+            }
+        }
         var slots: [Slot] = []
         var postings: [Date: [LedgerTransaction]] = [:]
         for transaction in transactions {
+            if transaction.origin == .cashback,
+               let purchaseID = transaction.sourceTransactionID, cashbackByPurchase[purchaseID] != nil {
+                continue
+            }
             guard transaction.origin == .interest else {
                 slots.append(.transaction(transaction))
                 continue
@@ -36,7 +48,7 @@ enum HistoryItem: Identifiable {
         return slots.map { slot in
             switch slot {
             case .transaction(let transaction):
-                .transaction(transaction)
+                .transaction(transaction, cashback: cashbackByPurchase[transaction.id])
             case .posting(let date):
                 .interest(InterestPosting(postedAt: date, entries: postings[date] ?? []))
             }

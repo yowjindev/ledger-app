@@ -13,6 +13,9 @@ struct TransactionDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @Query private var matches: [LedgerTransaction]
+    @Query private var cashbackMatches: [LedgerTransaction]
+    @Query private var plans: [PaymentPlan]
+    @Environment(\.moneyFormatter) private var formatter
 
     /// The last details shown. Keeps the screen intact while it closes after a deletion.
     @State private var lastShown: TransactionDetails?
@@ -26,6 +29,8 @@ struct TransactionDetailView: View {
         var descriptor = FetchDescriptor<LedgerTransaction>(predicate: #Predicate { $0.id == transactionID })
         descriptor.fetchLimit = 1
         _matches = Query(descriptor)
+        let key: UUID? = transactionID
+        _cashbackMatches = Query(filter: #Predicate<LedgerTransaction> { $0.sourceTransactionID == key })
     }
 
     var body: some View {
@@ -99,6 +104,14 @@ struct TransactionDetailView: View {
                 case .adjustment, nil:
                     accountRow("Account", account: details.account)
                 }
+                if let cashback = cashbackMatches.first {
+                    LabeledContent("Cashback") {
+                        MoneyText(cashback.amount, alwaysShowCentavos: true)
+                    }
+                }
+                if let plan = plan(for: details) {
+                    LabeledContent("Plan", value: "Part of a \(plan.months)-month plan")
+                }
             }
 
             if let note = details.summary.note {
@@ -137,11 +150,27 @@ struct TransactionDetailView: View {
                 ) {
                     Button("Delete Transaction", role: .destructive, action: deleteTransaction)
                 } message: {
-                    Text("This can't be undone.")
+                    Text(deletionMessage(details))
                 }
             }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private func plan(for details: TransactionDetails) -> PaymentPlan? {
+        guard let planID = details.planID else { return nil }
+        return plans.first { $0.id == planID }
+    }
+
+    private func deletionMessage(_ details: TransactionDetails) -> String {
+        guard details.planID != nil else {
+            return cashbackMatches.isEmpty
+                ? "This can't be undone."
+                : "Its cashback is deleted too. This can't be undone."
+        }
+        return details.origin == .planFees
+            ? "This also deletes its plan and purchase. This can't be undone."
+            : "This also deletes its plan and fees. This can't be undone."
     }
 
     @ViewBuilder
@@ -191,6 +220,7 @@ struct TransactionDetails: Equatable {
     let createdAt: Date
     let updatedAt: Date
     let origin: EntryOrigin
+    let planID: UUID?
 
     /// Whether the transaction was changed after it was first saved.
     var wasEdited: Bool { updatedAt.timeIntervalSince(createdAt) >= 1 }
@@ -205,6 +235,7 @@ struct TransactionDetails: Equatable {
         createdAt = transaction.createdAt
         updatedAt = transaction.updatedAt
         origin = transaction.origin
+        planID = transaction.planID
     }
 }
 

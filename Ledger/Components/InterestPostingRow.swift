@@ -35,9 +35,9 @@ struct HistoryItemLink: View {
 
     var body: some View {
         switch item {
-        case .transaction(let transaction):
+        case .transaction(let transaction, let cashback):
             NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-                TransactionRow(transaction: transaction, showsDate: showsDate)
+                TransactionRow(transaction: transaction, showsDate: showsDate, cashback: cashback)
             }
         case .interest(let posting):
             NavigationLink(value: LedgerRoute.interest(postedAt: posting.postedAt, accountID: accountID)) {
