@@ -407,6 +407,80 @@ final class IntentFlowTests: XCTestCase {
         XCTAssertEqual(try h.balance(gcash), 110)
     }
 
+    // MARK: Owed accounts
+
+    private func owedHarness() throws -> (LedgerHarness, Account) {
+        let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
+        let card = try h.ledger.createOwedAccount(
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_000, stillDue: nil
+        )
+        return (h, card)
+    }
+
+    func testUpdateWhatYouOweAsksAndConfirms() async throws {
+        let (h, card) = try owedHarness()
+        var prompts: [String] = []
+        var confirmations: [String] = []
+
+        let outcome = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: nil,
+            amount: nil,
+            askAccount: { prompts.append($0); return AccountEntity(card) },
+            askAmount: { prompts.append($0); return self.pesos("2150") },
+            confirm: { message, _ in confirmations.append(message) }
+        )
+
+        XCTAssertEqual(prompts, ["Which account do you want to update?", "What do you owe on Visa card?"])
+        XCTAssertEqual(confirmations.count, 1)
+        XCTAssertTrue(plainSpaces(confirmations[0]).hasPrefix("Change what you owe on Visa card to ₱2,150.00?"), confirmations[0])
+        XCTAssertEqual(try h.ledger.balance(of: card)?.owed?.amount, 2_150)
+        XCTAssertEqual(try h.ledger.transactions().first?.origin, .appIntent)
+        XCTAssertEqual(outcome.headline, "Updated what you owe")
+        XCTAssertEqual(outcome.rows.map(\.title), ["Visa card"])
+        XCTAssertEqual(outcome.rows[0].subtitle, "You owe")
+        XCTAssertTrue(plainSpaces(outcome.rows[0].value ?? "").contains("2,150"))
+        XCTAssertFalse(outcome.text.contains("\n"))
+    }
+
+    func testUpdateWhatYouOweTreatsZeroAsNotSupplied() async throws {
+        let (h, card) = try owedHarness()
+        var prompts: [String] = []
+
+        _ = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: AccountEntity(card),
+            amount: 0,
+            askAccount: { _ in throw UnexpectedPrompt() },
+            askAmount: { prompts.append($0); return self.pesos("1900") },
+            confirm: { _, _ in }
+        )
+
+        XCTAssertEqual(prompts, ["What do you owe on Visa card?"])
+        XCTAssertEqual(try h.ledger.balance(of: card)?.owed?.amount, 1_900)
+    }
+
+    func testCheckBalancesListsMoneyAccountsThenOwedAndNextDue() throws {
+        let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
+        try h.account("Bank", opening: 10_000)
+        try h.ledger.createOwedAccount(
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_500, stillDue: nil
+        )
+        let before = try h.transactionCount()
+
+        let outcome = try IntentFlows.balances(in: h.ledger)
+
+        XCTAssertEqual(outcome.rows.map(\.title), ["Bank", "You owe", "Next due"])
+        XCTAssertTrue(plainSpaces(outcome.rows[1].value ?? "").contains("2,500"))
+        XCTAssertTrue((outcome.rows[2].subtitle ?? "").hasPrefix("Visa card · "), outcome.rows[2].subtitle ?? "")
+        XCTAssertTrue(plainSpaces(outcome.headline).contains("10,000"), outcome.headline)
+        XCTAssertFalse(plainSpaces(outcome.headline).contains("7,500"), "The total excludes money owed")
+        let body = plainSpaces(try XCTUnwrap(outcome.body))
+        XCTAssertTrue(body.contains("You owe ₱2,500"), body)
+        XCTAssertEqual(try h.transactionCount(), before)
+        XCTAssertFalse(h.context.hasChanges)
+    }
+
     func testUpdateBalanceRefusesAnArchivedAccount() async throws {
         let h = try LedgerHarness()
         let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
