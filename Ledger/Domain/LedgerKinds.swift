@@ -138,4 +138,8 @@ enum EntryOrigin: String, Codable, Sendable {
     case appIntent
     /// Posted by Ledger: daily interest and its withholding tax.
     case interest
+    /// Added by Ledger with a credit card purchase: its cashback.
+    case cashback
+    /// Added by Ledger with a split purchase or loan: the extra the payments cost over the price.
+    case planFees
 }

@@ -60,6 +60,9 @@ struct LedgerService {
         _ = try? context.fetch(FetchDescriptor<Account>())
         _ = try? context.fetch(FetchDescriptor<LedgerCategory>())
         _ = try? context.fetch(FetchDescriptor<LedgerTransaction>())
+        _ = try? context.fetch(FetchDescriptor<PaymentPlan>())
+        _ = try? context.fetch(FetchDescriptor<Bill>())
+        _ = try? context.fetch(FetchDescriptor<DueOverride>())
     }
 
     /// Trims a name and checks it is non-empty, short enough, and not already used
