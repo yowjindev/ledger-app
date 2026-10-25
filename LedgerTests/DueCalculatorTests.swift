@@ -155,6 +155,28 @@ final class DueCalculatorTests: XCTestCase {
         XCTAssertEqual(left(month(2026, 3), visa), 1_000)
     }
 
+    func testCashAdvanceAfterCloseBelongsToNextCycle() throws {
+        let advance = Movement(
+            kind: .transfer, status: .posted, amountMinor: minor(5_000), currency: .php,
+            accountID: accountID, destinationAccountID: bankID, occurredAt: try at(3, 10)
+        )
+        let raised = Movement(
+            kind: .adjustment, status: .posted, amountMinor: minor(200), currency: .php,
+            accountID: accountID, destinationAccountID: nil, occurredAt: try at(3, 11), direction: .decrease
+        )
+        let visa = input(
+            .creditCard, card, opening: 0, started: try at(2, 20),
+            movements: [expense(1_000, at: try at(3, 2)), advance, raised]
+        )
+
+        XCTAssertEqual(visa.balance.owed?.amount, 6_200)
+        XCTAssertEqual(left(month(2026, 3), visa), 1_000)
+        let status = DueCalculator.status(visa, today: day(2026, 3, 15), calendar: calendar)
+        XCTAssertEqual(status.cycle, month(2026, 3))
+        XCTAssertFalse(status.isOverdue)
+        XCTAssertEqual(status.left?.amount, 1_000)
+    }
+
     func testUnpaidDueBecomesOverdueAndCarries() throws {
         let visa = input(
             .creditCard, card, opening: 0, started: try at(2, 1),

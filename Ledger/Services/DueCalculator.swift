@@ -83,6 +83,8 @@ struct OwedDueInput: Sendable {
 enum DueCalculator {
     /// What's left to pay for the due in `cycle`:
     /// what's owed now − charges billed in later cycles − plan payments due in later cycles.
+    /// Charges billed later are what raised the balance after the statement closed: purchases
+    /// (less their cashback), money taken out, and balance adjustments.
     ///
     /// For the cycle that was waiting for payment when the account was added, the "still due"
     /// amount entered then, less payments since. `nil` while the opening balance is unknown.
@@ -109,6 +111,11 @@ enum DueCalculator {
                     laterCharges += amount(of: movement)
                 case .income where movement.origin == .cashback:
                     laterCharges -= amount(of: movement)
+                case .transfer:
+                    // Money taken out of the account, such as a cash advance.
+                    laterCharges += amount(of: movement)
+                case .adjustment:
+                    laterCharges += movement.direction == .decrease ? amount(of: movement) : -amount(of: movement)
                 default:
                     break
                 }
