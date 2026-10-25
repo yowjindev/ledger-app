@@ -40,6 +40,12 @@ enum RateRules {
         return try rate(percent: percent)
     }
 
+    /// Cashback on purchases: above 0% and at most 100%.
+    static func cashbackRate(percent: Decimal) throws -> Rate {
+        guard !percent.isNaN, percent > .zero, percent <= 100 else { throw LedgerError.cashbackRateOutOfRange }
+        return try rate(percent: percent)
+    }
+
     private static func rate(percent: Decimal) throws -> Rate {
         guard percent.hasAtMostFractionDigits(maximumFractionDigits) else { throw LedgerError.rateTooPrecise }
         return Rate(partsPerMillion: NSDecimalNumber(decimal: percent * 10_000).int64Value)

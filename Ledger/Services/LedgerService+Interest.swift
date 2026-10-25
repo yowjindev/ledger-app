@@ -9,6 +9,9 @@ extension LedgerService {
     /// not yet posted. Interest turned on starts with today; earlier days are never filled in.
     func setInterest(_ terms: InterestTerms?, for account: Account) throws {
         guard account.modelContext != nil, !account.isDeleted else { throw LedgerError.accountNotFound }
+        if terms != nil, account.kind.isOwed {
+            throw LedgerError.wrongAccountGroup
+        }
         if terms != nil, account.isArchived {
             throw LedgerError.accountArchived(name: account.name)
         }

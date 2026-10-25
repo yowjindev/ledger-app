@@ -120,4 +120,21 @@ enum AmountRules {
         guard let minorUnits = currency.exactMinorUnits(for: amount) else { throw LedgerError.amountTooPrecise }
         return minorUnits
     }
+
+    /// Validates an amount owed or a credit limit, which may be zero but not negative.
+    static func owedMinorUnits(_ amount: Decimal, currency: CurrencyCode) throws -> Int64 {
+        guard !amount.isNaN, amount >= .zero else { throw LedgerError.owedNegative }
+        guard amount <= maximum else { throw LedgerError.amountTooLarge }
+        guard let minorUnits = currency.exactMinorUnits(for: amount) else { throw LedgerError.amountTooPrecise }
+        return minorUnits
+    }
+
+    /// Validates a balance of either sign, such as the opening balance of an account that owes
+    /// money, and returns it as exact minor units.
+    static func signedBalanceMinorUnits(_ amount: Decimal, currency: CurrencyCode) throws -> Int64 {
+        guard !amount.isNaN else { throw LedgerError.amountTooPrecise }
+        guard amount.magnitude <= maximum else { throw LedgerError.amountTooLarge }
+        guard let minorUnits = currency.exactMinorUnits(for: amount) else { throw LedgerError.amountTooPrecise }
+        return minorUnits
+    }
 }

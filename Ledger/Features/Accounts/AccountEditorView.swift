@@ -58,7 +58,7 @@ struct AccountEditorView: View {
                         .focused($focusedField, equals: .name)
                         .onSubmit { focusedField = .openingBalance }
                     Picker("Type", selection: $kind) {
-                        ForEach(AccountKind.allCases) { kind in
+                        ForEach(AccountKind.moneyKinds) { kind in
                             Label(kind.title, systemImage: kind.systemImage)
                                 .tag(kind)
                         }

@@ -70,6 +70,10 @@ struct AccountBalance: Identifiable, Hashable, Sendable {
     /// Opening balance plus net activity. `nil` while the opening balance is unknown, because
     /// the current balance can't be known either.
     var currentBalance: Money? { openingBalance.map { $0 + netActivity } }
+
+    /// What an account that owes money owes now: its balance with the sign flipped. Negative
+    /// when it holds a credit, `nil` while the opening balance is unknown.
+    var owed: Money? { currentBalance.map { -$0 } }
 }
 
 /// The total of liquid account balances.
@@ -93,6 +97,20 @@ struct BalanceSheet: Hashable, Sendable {
 
     var activeBalances: [AccountBalance] { balances.filter { !$0.account.isArchived } }
     var archivedBalances: [AccountBalance] { balances.filter { $0.account.isArchived } }
+    /// Active accounts that hold money the user has.
+    var moneyBalances: [AccountBalance] { activeBalances.filter { !$0.account.kind.isOwed } }
+    /// Active credit cards, pay later accounts, and loans.
+    var owedBalances: [AccountBalance] { activeBalances.filter { $0.account.kind.isOwed } }
+
+    /// The sum of what active owed accounts owe, credits included; accounts whose opening
+    /// balance is unknown are left out.
+    var totalOwed: Money {
+        let currency = liquidTotal.total.currency
+        return owedBalances
+            .filter { $0.account.currency == currency }
+            .compactMap(\.owed)
+            .reduce(Money.zero(currency), +)
+    }
 
     func balance(for accountID: UUID) -> AccountBalance? {
         balances.first { $0.id == accountID }

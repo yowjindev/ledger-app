@@ -89,6 +89,14 @@ enum AccountKind: String, CaseIterable, Codable, Sendable, Identifiable {
     case bank
     case eWallet
     case other
+    case creditCard
+    case payLater
+    case loan
+
+    /// Kinds that hold money the user has.
+    static let moneyKinds: [AccountKind] = [.cash, .bank, .eWallet, .other]
+    /// Kinds that hold money the user owes.
+    static let owedKinds: [AccountKind] = [.creditCard, .payLater, .loan]
 
     /// Decodes a stored raw value, falling back to `.other` for values written by a newer version.
     init(storedValue: String) {
@@ -103,6 +111,9 @@ enum AccountKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .bank: "Bank"
         case .eWallet: "E-wallet"
         case .other: "Other"
+        case .creditCard: "Credit card"
+        case .payLater: "Pay later"
+        case .loan: "Loan"
         }
     }
 
@@ -112,16 +123,23 @@ enum AccountKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .bank: "building.columns"
         case .eWallet: "iphone"
         case .other: "creditcard"
+        case .creditCard: "creditcard.fill"
+        case .payLater: "cart.badge.clock"
+        case .loan: "doc.text.fill"
         }
     }
 
-    /// Whether balances of this kind count toward the total liquid balance.
-    /// Future non-liquid kinds (investments, credit cards) return `false` here.
-    var countsTowardLiquidTotal: Bool {
+    /// Whether the account holds money the user owes rather than money they have. Its balance is
+    /// negative while something is owed.
+    var isOwed: Bool {
         switch self {
-        case .cash, .bank, .eWallet, .other: true
+        case .cash, .bank, .eWallet, .other: false
+        case .creditCard, .payLater, .loan: true
         }
     }
+
+    /// Whether balances of this kind count toward the total liquid balance. Money owed doesn't.
+    var countsTowardLiquidTotal: Bool { !isOwed }
 }
 
 /// Settlement state of a transaction. Only posted transactions affect balances.

@@ -30,6 +30,14 @@ enum LedgerError: Error, Equatable, Sendable {
     case interestRateOutOfRange
     case taxRateOutOfRange
     case rateTooPrecise
+    case owedNegative
+    case wrongAccountGroup
+    case dayOutOfRange
+    case statementDayRequired
+    case cashbackNotOffered
+    case cashbackRateOutOfRange
+    case stillDueNotApplicable
+    case stillDueAboveOwed
     case persistenceFailed
 }
 
@@ -92,6 +100,22 @@ extension LedgerError: LocalizedError {
             "Enter a tax rate from 0% to 100%."
         case .rateTooPrecise:
             "Rates can have at most four decimal places."
+        case .owedNegative:
+            "What you owe can't be negative."
+        case .wrongAccountGroup:
+            "Money you have and money you owe are kept apart, so this can't be changed."
+        case .dayOutOfRange:
+            "Choose a day from 1 to 31."
+        case .statementDayRequired:
+            "Choose the day the statement closes."
+        case .cashbackNotOffered:
+            "Only credit cards can have cashback."
+        case .cashbackRateOutOfRange:
+            "Enter a cashback rate above 0% and up to 100%."
+        case .stillDueNotApplicable:
+            "No bill is waiting for payment right now. Leave this empty."
+        case .stillDueAboveOwed:
+            "What's still due can't be more than the total you owe."
         case .persistenceFailed:
             "Ledger couldn't save. No changes were made."
         }
