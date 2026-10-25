@@ -199,9 +199,24 @@ extension LedgerService {
     }
 
     /// Permanently deletes a transaction. Callers confirm with the user first.
+    ///
+    /// Deleting a plan's purchase or fees deletes the whole plan with both entries, so a plan
+    /// never outlives what it paid for.
     func delete(_ transaction: LedgerTransaction) throws {
         guard transaction.modelContext != nil, !transaction.isDeleted else {
             throw LedgerError.transactionNotFound
+        }
+        if let planID = transaction.planID {
+            if let plan = try plan(id: planID) {
+                try deletePlan(plan)
+                return
+            }
+            for entry in try planEntries(planID: planID) {
+                context.delete(entry)
+            }
+            try commit()
+            Log.ledger.info("Deleted a transaction")
+            return
         }
         context.delete(transaction)
         try commit()

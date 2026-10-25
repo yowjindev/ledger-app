@@ -117,6 +117,9 @@ extension LedgerService {
         guard try transactionCount(for: account) == 0 else {
             throw LedgerError.accountHasTransactions(name: account.name)
         }
+        for override in try dueOverrides(for: account.id) {
+            context.delete(override)
+        }
         context.delete(account)
         try commit()
         Log.ledger.info("Deleted an account")
