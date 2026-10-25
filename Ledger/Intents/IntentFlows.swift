@@ -355,7 +355,7 @@ enum IntentFlows {
         case .adjustment, .setOpeningBalance:
             try await confirm("Change what you owe on \(target.name) to \(owedText)?", .continue)
         }
-        try IntentLedger.perform { try ledger.updateOwed(of: target, to: value, origin: .appIntent) }
+        _ = try IntentLedger.perform { try ledger.updateOwed(of: target, to: value, origin: .appIntent) }
         Log.intents.info("Updated what an owed account owes from an App Intent")
         return IntentOutcome(
             headline: "Updated what you owe",
