@@ -43,6 +43,10 @@ enum LedgerError: Error, Equatable, Sendable {
     case planTotalBelowPrice
     case paidMonthsOutOfRange
     case dueDateNotOnSchedule
+    case billHasPayments(name: String)
+    case arrivalDayNotApplicable
+    case moveDateOutOfRange
+    case billNotFound
     case persistenceFailed
 }
 
@@ -131,6 +135,14 @@ extension LedgerError: LocalizedError {
             "Months paid must be fewer than the total months."
         case .dueDateNotOnSchedule:
             "Choose one of this account's due dates."
+        case .billHasPayments(let name):
+            "\(name) has payments, so it can't be deleted. Archive it instead."
+        case .arrivalDayNotApplicable:
+            "Only bills whose amount varies have an arrival day."
+        case .moveDateOutOfRange:
+            "Choose a date from today up to the day before next month's due date."
+        case .billNotFound:
+            "That bill no longer exists."
         case .persistenceFailed:
             "Ledger couldn't save. No changes were made."
         }

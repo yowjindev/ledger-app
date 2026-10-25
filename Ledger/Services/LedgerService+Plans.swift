@@ -255,7 +255,8 @@ extension LedgerService {
         )
     }
 
-    private func expenseCategory(id: UUID) throws -> LedgerCategory {
+    /// An active expense category, for entries created outside the transaction editor.
+    func expenseCategory(id: UUID) throws -> LedgerCategory {
         guard let category = try category(id: id) else { throw LedgerError.categoryNotFound }
         guard category.kind == .expense else { throw LedgerError.categoryKindMismatch(expected: .expense) }
         guard !category.isArchived else { throw LedgerError.categoryArchived(name: category.name) }

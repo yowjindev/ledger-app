@@ -102,24 +102,7 @@ extension LedgerService {
             return existing
         }
         let resolved = try resolve(draft, editing: nil)
-        let transaction = LedgerTransaction(
-            kind: resolved.kind,
-            amountMinor: resolved.amountMinor,
-            currency: resolved.currency,
-            occurredAt: resolved.occurredAt,
-            createdAt: now,
-            note: resolved.note,
-            account: resolved.account,
-            destinationAccount: resolved.destination,
-            category: resolved.category,
-            origin: origin,
-            reference: resolved.reference,
-            requestID: requestID
-        )
-        context.insert(transaction)
-        if let rate = cashbackRate(for: transaction) {
-            insertCashback(for: transaction, rate: rate)
-        }
+        let transaction = insert(resolved, origin: origin, requestID: requestID)
         try commit()
         Log.ledger.info("Recorded a \(resolved.kind.rawValue, privacy: .public) transaction")
         return transaction
@@ -230,6 +213,29 @@ extension LedgerService {
         context.delete(transaction)
         try commit()
         Log.ledger.info("Deleted a transaction")
+    }
+
+    /// Inserts a validated transaction, with its cashback when it earns some, without saving.
+    func insert(_ resolved: ResolvedDraft, origin: EntryOrigin, requestID: UUID? = nil) -> LedgerTransaction {
+        let transaction = LedgerTransaction(
+            kind: resolved.kind,
+            amountMinor: resolved.amountMinor,
+            currency: resolved.currency,
+            occurredAt: resolved.occurredAt,
+            createdAt: now,
+            note: resolved.note,
+            account: resolved.account,
+            destinationAccount: resolved.destination,
+            category: resolved.category,
+            origin: origin,
+            reference: resolved.reference,
+            requestID: requestID
+        )
+        context.insert(transaction)
+        if let rate = cashbackRate(for: transaction) {
+            insertCashback(for: transaction, rate: rate)
+        }
+        return transaction
     }
 
     // MARK: Cashback

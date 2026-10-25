@@ -195,3 +195,63 @@ enum DueCalculator {
         movements.reduce(.zero) { $0 + amount(of: $1) }
     }
 }
+
+/// Everything about one regular bill the due calculations need.
+struct BillDueInput: Sendable {
+    let billID: UUID
+    let schedule: DueSchedule
+    /// The first cycle tracked; earlier cycles are never due.
+    let startCycle: CalendarMonth
+    /// The usual monthly amount, or `nil` when it varies.
+    let amountMinor: Int64?
+    /// Payments recorded for each cycle.
+    let paidByCycle: [CalendarMonth: Int64]
+    let overrides: [DueOverrideSnapshot]
+    let currency: CurrencyCode
+}
+
+extension DueCalculator {
+    /// Where a bill stands on `today`: last month's cycle while it's overdue, otherwise the next
+    /// due. Unlike debts, each cycle stands alone: what's left is that month's amount less the
+    /// payments recorded for it.
+    static func status(_ input: BillDueInput, today: CalendarDay) -> DueStatus {
+        var upcoming = max(input.startCycle, input.schedule.cycle(dueOnOrAfter: today).adding(months: -1))
+        while effectiveDue(upcoming, input) < today {
+            upcoming = upcoming.adding(months: 1)
+        }
+        let previous = upcoming.adding(months: -1)
+        if previous >= input.startCycle, effectiveDue(previous, input) < today {
+            let left = left(in: previous, input)
+            if left.map(\.isPositive) ?? true {
+                return makeStatus(previous, input, left: left, isOverdue: true)
+            }
+        }
+        return makeStatus(upcoming, input, left: left(in: upcoming, input), isOverdue: false)
+    }
+
+    private static func left(in cycle: CalendarMonth, _ input: BillDueInput) -> Money? {
+        guard let amountMinor = override(for: cycle, input)?.amountMinor ?? input.amountMinor else { return nil }
+        let leftMinor = max(0, amountMinor - (input.paidByCycle[cycle] ?? 0))
+        return Money(minorUnits: leftMinor, currency: input.currency)
+    }
+
+    private static func effectiveDue(_ cycle: CalendarMonth, _ input: BillDueInput) -> CalendarDay {
+        override(for: cycle, input)?.movedTo ?? input.schedule.dueDate(in: cycle)
+    }
+
+    private static func override(for cycle: CalendarMonth, _ input: BillDueInput) -> DueOverrideSnapshot? {
+        input.overrides.first { $0.ownerID == input.billID && $0.cycle == cycle }
+    }
+
+    private static func makeStatus(_ cycle: CalendarMonth, _ input: BillDueInput, left: Money?, isOverdue: Bool) -> DueStatus {
+        DueStatus(
+            owner: .bill(input.billID),
+            cycle: cycle,
+            dueDate: effectiveDue(cycle, input),
+            originalDueDate: input.schedule.dueDate(in: cycle),
+            left: left,
+            isOverdue: isOverdue,
+            isStatementClosed: true
+        )
+    }
+}
