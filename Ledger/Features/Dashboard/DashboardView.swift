@@ -50,7 +50,7 @@ struct DashboardView: View {
                 periodSection
             }
 
-            accountsSection(activeBalances)
+            accountsSection(sheet.moneyBalances)
 
             if !isFirstRun {
                 recentSection

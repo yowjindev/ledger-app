@@ -61,8 +61,42 @@ enum SampleData {
                 )
                 try ledger.postDueInterest()
             }
+            try loadOwedAccounts(ledger: ledger, existing: accounts, expenses: expenses, hoursAgo: hoursAgo)
         } catch {
             Log.persistence.error("Could not load sample data: \(String(describing: error), privacy: .private)")
+        }
+    }
+
+    /// A credit card with cashback and two purchases, and a pay later account. Skips any whose
+    /// name is already taken.
+    private static func loadOwedAccounts(
+        ledger: LedgerService,
+        existing: [String: Account],
+        expenses: [String: LedgerCategory],
+        hoursAgo: (Double) -> Date
+    ) throws {
+        if existing["Visa card"] == nil {
+            let card = try ledger.createOwedAccount(
+                name: "Visa card",
+                kind: .creditCard,
+                terms: OwedTerms(statementDay: 5, dueDay: 25, creditLimit: 20_000, cashbackPercent: 1),
+                owedNow: 1_500,
+                stillDue: nil
+            )
+            for (amount, category, age) in [(Decimal(650), "Food", 4.0), (Decimal(250), "Shopping", 30.0)] {
+                if let category = expenses[category] {
+                    try ledger.recordExpense(amount: amount, accountID: card.id, categoryID: category.id, occurredAt: hoursAgo(age))
+                }
+            }
+        }
+        if existing["PayLater"] == nil {
+            try ledger.createOwedAccount(
+                name: "PayLater",
+                kind: .payLater,
+                terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000),
+                owedNow: 1_500,
+                stillDue: nil
+            )
         }
     }
 
