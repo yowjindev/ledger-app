@@ -232,6 +232,21 @@ final class BillTests: XCTestCase {
         XCTAssertFalse(try f.h.ledger.dueStatus(for: bill).isOverdue)
     }
 
+    func testABillAlreadyPaidThisMonthStartsNextMonth() throws {
+        let f = try fixture(now: "2026-03-20T10:00:00+08:00")
+        let bill = try f.h.ledger.createBill(
+            BillTerms(name: "Rent", categoryID: f.rent.id, dueDay: 25, amount: 8_000, arrivesDay: nil, payFromAccountID: nil),
+            alreadyPaid: true
+        )
+        XCTAssertEqual(bill.startCycle, 202604)
+
+        f.h.clock.now = try instant("2026-03-26T10:00:00+08:00")
+        let due = try f.h.ledger.dueStatus(for: bill)
+        XCTAssertEqual(due.cycle, april)
+        XCTAssertFalse(due.isOverdue)
+        XCTAssertEqual(try f.h.transactionCount(), 0, "Nothing is recorded for the month already paid")
+    }
+
     func testArrivalDayOnlyForVaryingBills() throws {
         let f = try fixture()
         assertThrowsLedgerError(.arrivalDayNotApplicable) {

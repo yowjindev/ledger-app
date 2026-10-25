@@ -24,6 +24,7 @@ struct BillEditorView: View {
     @State private var amount: Decimal?
     @State private var arrivesDay: Int?
     @State private var payFromID: UUID?
+    @State private var isAlreadyPaid = false
     @State private var isSaving = false
     @State private var alert: LedgerAlert?
     @State private var isConfirmingDiscard = false
@@ -87,6 +88,13 @@ struct BillEditorView: View {
                     Text(amountKind == .fixed
                         ? "Rent, internet, and subscriptions usually cost the same each month."
                         : "Electricity and water change each month. Enter the amount when the bill arrives.")
+                }
+                if bill == nil {
+                    Section {
+                        Toggle("Already Paid This Month", isOn: $isAlreadyPaid)
+                    } footer: {
+                        Text("Turn this on if you've already paid and logged this month's bill, so it isn't due twice.")
+                    }
                 }
                 Section {
                     Picker("Pay From", selection: $payFromID) {
@@ -163,7 +171,7 @@ struct BillEditorView: View {
             if let bill {
                 try ledger.updateBill(bill, with: terms)
             } else {
-                try ledger.createBill(terms)
+                try ledger.createBill(terms, alreadyPaid: isAlreadyPaid)
             }
             dismiss()
         } catch {

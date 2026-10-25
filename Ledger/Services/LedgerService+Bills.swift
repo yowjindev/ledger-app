@@ -70,9 +70,10 @@ extension LedgerService {
 
     // MARK: Mutations
 
-    /// Creates a bill, tracked from its first due date on or after today.
+    /// Creates a bill, tracked from its first due date on or after today, or from the one after
+    /// that when this month's is `alreadyPaid` (for example, logged before the bill was added).
     @discardableResult
-    func createBill(_ terms: BillTerms) throws -> Bill {
+    func createBill(_ terms: BillTerms, alreadyPaid: Bool = false) throws -> Bill {
         let existing = try bills(includeArchived: true)
         let validated = try validatedBill(terms, existingNames: existing.map(\.name), currentCategoryID: nil)
         let schedule = DueSchedule(statementDay: nil, dueDay: terms.dueDay)
@@ -84,7 +85,7 @@ extension LedgerService {
             arrivesDay: terms.arrivesDay,
             payFrom: validated.payFrom,
             createdAt: now,
-            startCycle: schedule.cycle(dueOnOrAfter: today).storedValue,
+            startCycle: schedule.cycle(dueOnOrAfter: today).adding(months: alreadyPaid ? 1 : 0).storedValue,
             sortOrder: (existing.map(\.sortOrder).max() ?? -1) + 1
         )
         context.insert(bill)
