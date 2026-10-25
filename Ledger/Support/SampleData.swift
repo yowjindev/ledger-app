@@ -62,6 +62,7 @@ enum SampleData {
                 try ledger.postDueInterest()
             }
             try loadOwedAccounts(ledger: ledger, existing: accounts, expenses: expenses, hoursAgo: hoursAgo)
+            try loadBills(ledger: ledger, expenses: expenses, payFrom: accounts["PNB"])
         } catch {
             Log.persistence.error("Could not load sample data: \(String(describing: error), privacy: .private)")
         }
@@ -105,6 +106,22 @@ enum SampleData {
                 owedNow: 1_500,
                 stillDue: nil
             )
+        }
+    }
+
+    /// Rent at a fixed amount and electricity whose amount varies. Skips any whose name is
+    /// already taken.
+    private static func loadBills(ledger: LedgerService, expenses: [String: LedgerCategory], payFrom: Account?) throws {
+        let existing = Set(try ledger.bills(includeArchived: true).map(\.name))
+        if !existing.contains("Rent"), let bills = expenses["Bills"] {
+            try ledger.createBill(BillTerms(
+                name: "Rent", categoryID: bills.id, dueDay: 25, amount: 8_000, arrivesDay: nil, payFromAccountID: payFrom?.id
+            ))
+        }
+        if !existing.contains("Electricity"), let bills = expenses["Bills"] {
+            try ledger.createBill(BillTerms(
+                name: "Electricity", categoryID: bills.id, dueDay: 30, amount: nil, arrivesDay: 19, payFromAccountID: nil
+            ))
         }
     }
 

@@ -17,12 +17,13 @@ struct BillsView: View {
     @State private var now = Date.now
     @State private var adding: AccountKind?
     @State private var isAddingLoan = false
+    @State private var isAddingBill = false
 
     var body: some View {
         let sheet = LedgerService.balanceSheet(accounts: accounts, transactions: transactions)
         let today = CalendarDay(containing: now, calendar: calendar)
         Group {
-            if sheet.owedBalances.isEmpty && bills.allSatisfy(\.isArchived) && !hasArchived(sheet) {
+            if sheet.owedBalances.isEmpty && bills.isEmpty && !hasArchived(sheet) {
                 emptyState
             } else {
                 list(sheet, today: today)
@@ -40,6 +41,9 @@ struct BillsView: View {
         }
         .sheet(isPresented: $isAddingLoan) {
             LoanEditorView()
+        }
+        .sheet(isPresented: $isAddingBill) {
+            BillEditorView()
         }
     }
 
@@ -66,6 +70,16 @@ struct BillsView: View {
             group("Credit Cards", kind: .creditCard, sheet: sheet)
             group("Pay Later", kind: .payLater, sheet: sheet)
             group("Loans", kind: .loan, sheet: sheet)
+            let activeBills = bills.filter { !$0.isArchived }
+            if !activeBills.isEmpty {
+                Section("Bills") {
+                    ForEach(activeBills) { bill in
+                        NavigationLink(value: LedgerRoute.bill(bill.id)) {
+                            BillRow(bill: bill)
+                        }
+                    }
+                }
+            }
             if !sheet.owedBalances.isEmpty {
                 Section {
                     LabeledContent("Total You Owe") {
@@ -78,11 +92,17 @@ struct BillsView: View {
                 }
             }
             let archived = sheet.archivedBalances.filter { $0.account.kind.isOwed }
-            if !archived.isEmpty {
+            let archivedBills = bills.filter(\.isArchived)
+            if !archived.isEmpty || !archivedBills.isEmpty {
                 Section("Archived") {
                     ForEach(archived) { balance in
                         NavigationLink(value: LedgerRoute.account(balance.id)) {
                             OwedAccountRow(balance: balance)
+                        }
+                    }
+                    ForEach(archivedBills) { bill in
+                        NavigationLink(value: LedgerRoute.bill(bill.id)) {
+                            BillRow(bill: bill)
                         }
                     }
                 }
@@ -102,7 +122,9 @@ struct BillsView: View {
             }
         case .bill(let id):
             if let bill = bills.first(where: { $0.id == id }) {
-                DueStatusRow(status: status, name: bill.name, systemImage: bill.category?.symbolName ?? "doc.text", today: today, calendar: calendar)
+                NavigationLink(value: LedgerRoute.bill(id)) {
+                    DueStatusRow(status: status, name: bill.name, systemImage: bill.category?.symbolName ?? "doc.text", today: today, calendar: calendar)
+                }
             }
         }
     }
@@ -125,7 +147,7 @@ struct BillsView: View {
         ContentUnavailableView {
             Label("No Bills Yet", systemImage: "calendar")
         } description: {
-            Text("Add your credit cards, pay later accounts, and loans to see what you owe and when it's due.")
+            Text("Add your credit cards, pay later accounts, loans, and regular bills to see what you owe and when it's due.")
         } actions: {
             Button {
                 adding = .creditCard
@@ -138,6 +160,9 @@ struct BillsView: View {
             }
             Button("Add Loan") {
                 isAddingLoan = true
+            }
+            Button("Add Bill") {
+                isAddingBill = true
             }
         }
     }
@@ -152,6 +177,10 @@ struct BillsView: View {
             }
             Button("Loan", systemImage: AccountKind.loan.systemImage) {
                 isAddingLoan = true
+            }
+            Divider()
+            Button("Bill", systemImage: "doc.text") {
+                isAddingBill = true
             }
         } label: {
             Label("Add", systemImage: "plus")
@@ -203,4 +232,33 @@ struct BillsView: View {
             .ledgerRouteDestinations()
     }
     .ledgerPreview(sampleData: false)
+}
+
+/// A regular bill in a list: its category symbol, name, and due day, with the monthly amount.
+private struct BillRow: View {
+    let bill: Bill
+
+    @Environment(\.moneyFormatter) private var formatter
+
+    var body: some View {
+        AdaptiveRowLayout {
+            HStack(spacing: 12) {
+                SymbolBadge(systemName: bill.category?.symbolName ?? "doc.text", tint: bill.isArchived ? .secondary : .accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bill.name)
+                    Text("Due \(BillsCopy.dayPhrase(bill.dueDay))")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } trailing: {
+            Text(bill.amount.map { formatter.string($0) } ?? "Varies")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(bill.amount == nil ? .secondary : .primary)
+                .monospacedDigit()
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(bill.name), due \(BillsCopy.dayPhrase(bill.dueDay)), \(bill.amount.map { formatter.string($0, alwaysShowCentavos: true) } ?? "amount varies")")
+    }
 }

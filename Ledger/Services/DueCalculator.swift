@@ -59,6 +59,10 @@ struct DueStatus: Hashable, Sendable {
     var isPaid: Bool { left?.isZero == true }
 }
 
+extension DueStatus: Identifiable {
+    var id: DueOwner { owner }
+}
+
 /// Everything about one owed account the due calculations need.
 struct OwedDueInput: Sendable {
     let balance: AccountBalance

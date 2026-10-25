@@ -50,6 +50,7 @@ final class AppRouter {
 enum LedgerRoute: Hashable, Sendable {
     case transaction(UUID)
     case account(UUID)
+    case bill(UUID)
     /// The automatic interest credited at one moment, for one account or every account.
     case interest(postedAt: Date, accountID: UUID?)
 }
@@ -63,6 +64,8 @@ extension View {
                 TransactionDetailView(transactionID: id)
             case .account(let id):
                 AccountDestination(accountID: id)
+            case .bill(let id):
+                BillDetailView(billID: id)
             case .interest(let postedAt, let accountID):
                 InterestPostingDetailView(postedAt: postedAt, accountID: accountID)
             }

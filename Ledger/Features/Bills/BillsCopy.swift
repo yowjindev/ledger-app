@@ -7,6 +7,11 @@ enum BillsCopy {
         day == 31 ? "Last day of the month" : "Day \(day)"
     }
 
+    /// A day of the month inside a sentence: "day 19", or "the last day of the month" for 31.
+    static func dayPhrase(_ day: Int) -> String {
+        day == 31 ? "the last day of the month" : "day \(day)"
+    }
+
     /// An owed kind as used in titles and buttons: "Credit Card", "Pay Later", "Loan".
     static func kindTitle(_ kind: AccountKind) -> String {
         switch kind {

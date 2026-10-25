@@ -24,6 +24,7 @@ struct OwedAccountDetailView: View {
     @State private var isConfirmingDelete = false
     @State private var didDelete = false
     @State private var isAddingPlan = false
+    @State private var movingDue: DueStatus?
     @State private var planToDelete: PaymentPlan?
     @State private var alert: LedgerAlert?
 
@@ -92,6 +93,11 @@ struct OwedAccountDetailView: View {
         .sheet(isPresented: $isAddingPlan) {
             ExistingPlanView(account: account)
         }
+        .sheet(item: $movingDue) { status in
+            if let schedule = account.dueSchedule {
+                MoveDueView(owner: .account(account.id), cycle: status.cycle, schedule: schedule, currentDue: status.dueDate)
+            }
+        }
         .confirmationDialog(
             "Delete \(planToDelete?.title ?? "Plan")?",
             isPresented: isConfirmingPlanDelete,
@@ -157,6 +163,11 @@ struct OwedAccountDetailView: View {
                     Text(DueStatusCopy.dateText(status, today: today, calendar: calendar))
                 }
                 .foregroundStyle(status.isOverdue ? .red : .primary)
+            }
+            if !status.isPaid, !account.isArchived {
+                Button("Move This Due", systemImage: "calendar.badge.clock") {
+                    movingDue = status
+                }
             }
         } header: {
             Text(status.isOverdue ? "Overdue" : "Current Due")

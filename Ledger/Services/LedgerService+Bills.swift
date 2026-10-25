@@ -145,7 +145,8 @@ extension LedgerService {
     }
 
     /// Records a payment toward one cycle of a bill: an expense in the bill's category, tagged
-    /// with the bill and cycle, in one save.
+    /// with the bill and cycle, in one save. For a bill whose amount varies and hasn't been
+    /// entered for that cycle, the payment's amount becomes the cycle's amount.
     @discardableResult
     func payBill(
         _ bill: Bill,
@@ -162,6 +163,12 @@ extension LedgerService {
         let payment = insert(resolved, origin: origin)
         payment.billID = bill.id
         payment.billCycle = cycle.storedValue
+        if bill.amountMinor == nil {
+            let override = try dueOverride(for: bill.id, cycle: cycle)
+            if override.amountMinor == nil {
+                override.amountMinor = resolved.amountMinor
+            }
+        }
         try commit()
         Log.ledger.info("Recorded a bill payment")
         return payment

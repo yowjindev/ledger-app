@@ -78,6 +78,23 @@ final class BillTests: XCTestCase {
         XCTAssertEqual(override.amountMinor, 235_000)
     }
 
+    func testPayingAVaryingBillWithoutAnAmountSetsIt() throws {
+        let f = try fixture()
+        let utilities = try f.h.expenseCategory("Utilities")
+        let bill = try f.h.ledger.createBill(BillTerms(
+            name: "Electricity", categoryID: utilities.id, dueDay: 30, amount: nil, arrivesDay: 19, payFromAccountID: nil
+        ))
+
+        try pay(2_350, bill, cycle: march, f)
+
+        let due = try f.h.ledger.dueStatus(for: bill)
+        XCTAssertTrue(due.isPaid)
+        XCTAssertEqual(try f.h.ledger.dueOverrides(for: bill.id).first?.amountMinor, 235_000)
+
+        try f.h.ledger.setAmount(2_500, for: bill, cycle: march)
+        XCTAssertEqual(try f.h.ledger.dueStatus(for: bill).left?.amount, 150, "An amount already set is kept by later payments")
+    }
+
     func testPartialPaymentLeavesTheRest() throws {
         let f = try fixture()
         let bill = try rentBill(f)

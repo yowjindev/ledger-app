@@ -125,7 +125,7 @@ enum AccountKind: String, CaseIterable, Codable, Sendable, Identifiable {
         case .other: "creditcard"
         case .creditCard: "creditcard.fill"
         case .payLater: "cart.badge.clock"
-        case .loan: "doc.text.fill"
+        case .loan: "clock.arrow.circlepath"
         }
     }
 
