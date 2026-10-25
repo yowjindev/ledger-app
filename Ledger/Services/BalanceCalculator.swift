@@ -24,6 +24,9 @@ struct Movement: Hashable, Sendable {
     let occurredAt: Date
     /// For adjustments, whether the balance went up or down; `nil` for other kinds.
     let direction: AdjustmentDirection?
+    let origin: EntryOrigin
+    /// The payment plan a split purchase or its fees belong to.
+    let planID: UUID?
 
     init(
         kind: TransactionKind,
@@ -33,7 +36,9 @@ struct Movement: Hashable, Sendable {
         accountID: UUID?,
         destinationAccountID: UUID?,
         occurredAt: Date,
-        direction: AdjustmentDirection? = nil
+        direction: AdjustmentDirection? = nil,
+        origin: EntryOrigin = .app,
+        planID: UUID? = nil
     ) {
         self.kind = kind
         self.status = status
@@ -43,6 +48,8 @@ struct Movement: Hashable, Sendable {
         self.destinationAccountID = destinationAccountID
         self.occurredAt = occurredAt
         self.direction = direction
+        self.origin = origin
+        self.planID = planID
     }
 }
 
