@@ -36,6 +36,7 @@ struct TransactionEditorView: View {
     @State private var duplicateWarning: DuplicateWarning?
     @State private var isConfirmingDiscard = false
     @State private var isConfirmingDeletion = false
+    @State private var split = SplitPlanInput()
     @State private var alert: LedgerAlert?
     @FocusState private var focusedField: Field?
 
@@ -122,6 +123,10 @@ struct TransactionEditorView: View {
             }
 
             accountSection
+
+            if canSplit {
+                SplitPlanSection(input: $split, price: form.amount)
+            }
 
             Section {
                 DatePicker(
@@ -281,11 +286,17 @@ struct TransactionEditorView: View {
     }
 
     private var hasUnsavedChanges: Bool {
-        phase == .ready && form != initialForm
+        phase == .ready && (form != initialForm || split != SplitPlanInput())
     }
 
     private var canSave: Bool {
-        phase == .ready && !isSaving && form.draft != nil && selectionsAreAvailable
+        phase == .ready && !isSaving && form.draft != nil && selectionsAreAvailable && (!canSplit || split.isComplete)
+    }
+
+    /// Whether this new expense can be split into monthly payments: only on a pay later account.
+    private var canSplit: Bool {
+        guard !isEditing, form.kind == .expense, let accountID = form.accountID else { return false }
+        return accounts.first { $0.id == accountID }?.kind == .payLater
     }
 
     /// Whether the chosen accounts and category are still offered, for example not archived since
@@ -406,6 +417,10 @@ struct TransactionEditorView: View {
             if form.occurredAt == initialForm.occurredAt {
                 draft.occurredAt = .now
             }
+            if canSplit, let purchase = split.purchase(from: draft) {
+                recordSplit(purchase)
+                return
+            }
             if AppPreferences.warnsAboutDuplicates(), let match = try? ledger.recentDuplicate(of: draft) {
                 duplicateWarning = DuplicateWarning(draft: draft, message: duplicateMessage(for: match))
             } else {
@@ -435,6 +450,19 @@ struct TransactionEditorView: View {
             if let accountID = draft.accountID {
                 lastUsedAccountID = accountID.uuidString
             }
+            dismiss()
+        } catch {
+            isSaving = false
+            alert = LedgerAlert(error)
+        }
+    }
+
+    private func recordSplit(_ purchase: SplitPurchase) {
+        guard !isSaving else { return }
+        isSaving = true
+        do {
+            try ledger.recordSplitPurchase(purchase)
+            lastUsedAccountID = purchase.accountID.uuidString
             dismiss()
         } catch {
             isSaving = false

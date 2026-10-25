@@ -16,6 +16,7 @@ struct BillsView: View {
     @Query private var overrides: [DueOverride]
     @State private var now = Date.now
     @State private var adding: AccountKind?
+    @State private var isAddingLoan = false
 
     var body: some View {
         let sheet = LedgerService.balanceSheet(accounts: accounts, transactions: transactions)
@@ -36,6 +37,9 @@ struct BillsView: View {
         .refreshingCurrentDate($now)
         .sheet(item: $adding) { kind in
             OwedAccountEditorView(kind: kind)
+        }
+        .sheet(isPresented: $isAddingLoan) {
+            LoanEditorView()
         }
     }
 
@@ -110,7 +114,7 @@ struct BillsView: View {
             Section(title) {
                 ForEach(balances) { balance in
                     NavigationLink(value: LedgerRoute.account(balance.id)) {
-                        OwedAccountRow(balance: balance, available: available(for: balance))
+                        OwedAccountRow(balance: balance, available: available(for: balance), detail: loanProgress(for: balance))
                     }
                 }
             }
@@ -132,6 +136,9 @@ struct BillsView: View {
             Button("Add Pay Later") {
                 adding = .payLater
             }
+            Button("Add Loan") {
+                isAddingLoan = true
+            }
         }
     }
 
@@ -143,6 +150,9 @@ struct BillsView: View {
             Button("Pay Later", systemImage: AccountKind.payLater.systemImage) {
                 adding = .payLater
             }
+            Button("Loan", systemImage: AccountKind.loan.systemImage) {
+                isAddingLoan = true
+            }
         } label: {
             Label("Add", systemImage: "plus")
         }
@@ -153,6 +163,25 @@ struct BillsView: View {
     private func available(for balance: AccountBalance) -> Money? {
         let limit = accounts.first { $0.id == balance.id }?.creditLimitMinor
         return DueCalculator.availableCredit(limitMinor: limit, balance: balance)
+    }
+
+    /// A loan's progress, such as "6 of 12 paid", from its first plan.
+    private func loanProgress(for balance: AccountBalance) -> String? {
+        guard
+            balance.account.kind == .loan,
+            let account = accounts.first(where: { $0.id == balance.id }),
+            let plan = plans.filter({ $0.account?.id == balance.id }).min(by: { $0.createdAt < $1.createdAt }),
+            let snapshot = PlanSnapshot(plan),
+            let input = LedgerService.owedDueInput(
+                for: account,
+                balance: balance,
+                movements: transactions.compactMap(Movement.init),
+                plans: plans,
+                overrides: overrides
+            )
+        else { return nil }
+        let today = CalendarDay(containing: now, calendar: calendar)
+        return PlanCopy.progress(paid: DueCalculator.monthsPaid(snapshot, input, today: today, calendar: calendar), months: plan.months)
     }
 
     private func hasArchived(_ sheet: BalanceSheet) -> Bool {

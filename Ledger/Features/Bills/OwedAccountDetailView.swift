@@ -23,6 +23,8 @@ struct OwedAccountDetailView: View {
     @State private var isConfirmingArchive = false
     @State private var isConfirmingDelete = false
     @State private var didDelete = false
+    @State private var isAddingPlan = false
+    @State private var planToDelete: PaymentPlan?
     @State private var alert: LedgerAlert?
 
     init(accountID: UUID) {
@@ -48,13 +50,17 @@ struct OwedAccountDetailView: View {
     private func content(account: Account, balance: AccountBalance) -> some View {
         let history = transactions.filter { $0.account?.id == accountID || $0.destinationAccount?.id == accountID }
         let today = CalendarDay(containing: now, calendar: calendar)
-        let status = dueStatus(account: account, balance: balance, today: today)
+        let input = dueInput(account: account, balance: balance)
+        let status = input.map { DueCalculator.status($0, today: today, calendar: calendar) }
         return List {
             Section {
                 header(balance)
             }
             if let status {
                 dueSection(status, account: account, today: today)
+            }
+            if account.kind == .payLater || account.kind == .loan {
+                plansSection(account: account, input: input, today: today)
             }
             limitSection(account: account, balance: balance)
             if let schedule = account.dueSchedule, schedule.statementDay != nil {
@@ -82,6 +88,24 @@ struct OwedAccountDetailView: View {
         }
         .sheet(isPresented: $isUpdatingOwed) {
             UpdateOwedView(account: account)
+        }
+        .sheet(isPresented: $isAddingPlan) {
+            ExistingPlanView(account: account)
+        }
+        .confirmationDialog(
+            "Delete \(planToDelete?.title ?? "Plan")?",
+            isPresented: isConfirmingPlanDelete,
+            titleVisibility: .visible,
+            presenting: planToDelete
+        ) { plan in
+            Button("Delete Plan", role: .destructive) {
+                deletePlan(plan)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { plan in
+            Text(plan.purchaseID == nil
+                ? "Ledger stops splitting its payments across dues. What \(account.name) owes doesn't change."
+                : "Its purchase and fees are deleted too, so what \(account.name) owes goes down by its total.")
         }
         .ledgerAlert($alert)
     }
@@ -141,6 +165,31 @@ struct OwedAccountDetailView: View {
                 Text("Purchases until \(DueStatusCopy.shortDate(close, calendar: calendar)) are added to this due.")
             } else if status.dueDate != status.originalDueDate {
                 Text("Moved from \(DueStatusCopy.shortDate(status.originalDueDate, calendar: calendar)) for this month only.")
+            }
+        }
+    }
+
+    private func plansSection(account: Account, input: OwedDueInput?, today: CalendarDay) -> some View {
+        let accountPlans = plans.filter { $0.account?.id == accountID }.sorted { $0.createdAt < $1.createdAt }
+        return Section {
+            ForEach(accountPlans) { plan in
+                PlanRow(plan: plan, monthsPaid: monthsPaid(plan, input: input, today: today))
+                    .swipeActions {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            planToDelete = plan
+                        }
+                    }
+            }
+            if account.kind == .payLater && !account.isArchived {
+                Button("Add a Split You're Already Paying", systemImage: "plus.circle") {
+                    isAddingPlan = true
+                }
+            }
+        } header: {
+            Text(account.kind == .loan ? "Payments" : "Splits")
+        } footer: {
+            if account.kind == .payLater {
+                Text("Split a new purchase when you log it on this account.")
             }
         }
     }
@@ -265,15 +314,32 @@ struct OwedAccountDetailView: View {
 
     // MARK: Helpers
 
-    private func dueStatus(account: Account, balance: AccountBalance, today: CalendarDay) -> DueStatus? {
-        guard let input = LedgerService.owedDueInput(
+    private func dueInput(account: Account, balance: AccountBalance) -> OwedDueInput? {
+        LedgerService.owedDueInput(
             for: account,
             balance: balance,
             movements: transactions.compactMap(Movement.init),
             plans: plans,
             overrides: overrides
-        ) else { return nil }
-        return DueCalculator.status(input, today: today, calendar: calendar)
+        )
+    }
+
+    private func monthsPaid(_ plan: PaymentPlan, input: OwedDueInput?, today: CalendarDay) -> Int {
+        guard let input, let snapshot = PlanSnapshot(plan) else { return plan.paidAtStart }
+        return DueCalculator.monthsPaid(snapshot, input, today: today, calendar: calendar)
+    }
+
+    private var isConfirmingPlanDelete: Binding<Bool> {
+        Binding(get: { planToDelete != nil }, set: { if !$0 { planToDelete = nil } })
+    }
+
+    private func deletePlan(_ plan: PaymentPlan) {
+        do {
+            try LedgerService(context: modelContext).deletePlan(plan)
+        } catch {
+            alert = LedgerAlert(error)
+        }
+        planToDelete = nil
     }
 
     private func headerAccessibilityText(_ balance: AccountBalance) -> String {

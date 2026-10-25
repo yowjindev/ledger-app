@@ -67,8 +67,8 @@ enum SampleData {
         }
     }
 
-    /// A credit card with cashback and two purchases, and a pay later account. Skips any whose
-    /// name is already taken.
+    /// A credit card with cashback and two purchases, a loan partway through, and a pay later
+    /// account. Skips any whose name is already taken.
     private static func loadOwedAccounts(
         ledger: LedgerService,
         existing: [String: Account],
@@ -88,6 +88,14 @@ enum SampleData {
                     try ledger.recordExpense(amount: amount, accountID: card.id, categoryID: category.id, occurredAt: hoursAgo(age))
                 }
             }
+        }
+        if existing["Phone loan"] == nil {
+            let nextDue = CalendarDay(containing: hoursAgo(-24 * 10), calendar: ledger.calendar)
+            try ledger.createLoan(
+                name: "Phone loan",
+                terms: PlanTerms(title: "Phone", monthly: 2_400, last: nil, months: 12, paidAtStart: 6, nextDue: nextDue),
+                purchase: nil
+            )
         }
         if existing["PayLater"] == nil {
             try ledger.createOwedAccount(
