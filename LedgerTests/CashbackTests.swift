@@ -73,6 +73,19 @@ final class CashbackTests: XCTestCase {
         XCTAssertEqual(try cashbackEntries(f).count, 1)
     }
 
+    func testTurningCashbackOffKeepsWhatWasEarned() throws {
+        let f = try fixture()
+        let bought = try purchase(1_000, on: f.card, f)
+        try f.h.ledger.updateOwedAccount(f.card, name: "Visa card", terms: OwedTerms(statementDay: 5, dueDay: 25))
+
+        try f.h.ledger.update(bought, with: .expense(
+            amount: 1_000, accountID: f.card.id, categoryID: f.food.id, occurredAt: f.h.clock.now, note: "Groceries"
+        ))
+
+        XCTAssertEqual(try f.h.ledger.cashback(for: bought)?.amountMinor, 1_000)
+        XCTAssertEqual(try f.h.ledger.balance(of: f.card)?.owed?.amount, 990)
+    }
+
     func testMovingThePurchaseOffTheCardRemovesCashback() throws {
         let f = try fixture()
         let bought = try purchase(500, on: f.card, f)

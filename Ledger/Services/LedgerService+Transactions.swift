@@ -248,17 +248,18 @@ extension LedgerService {
         return try context.fetch(descriptor).first
     }
 
-    /// The rate a purchase earns cashback at now: an expense entered by the user, outside a
-    /// payment plan, on a credit card that has cashback. `nil` otherwise.
+    /// Whether a transaction is a purchase that can earn cashback: an expense entered by the user,
+    /// outside a payment plan, on a credit card.
+    private func earnsCashback(_ transaction: LedgerTransaction) -> Bool {
+        transaction.kind == .expense
+            && (transaction.origin == .app || transaction.origin == .appIntent)
+            && transaction.planID == nil
+            && transaction.account?.kind == .creditCard
+    }
+
+    /// The rate a purchase earns cashback at now, or `nil` when it can't or its card has none.
     private func cashbackRate(for transaction: LedgerTransaction) -> Rate? {
-        guard
-            transaction.kind == .expense,
-            transaction.origin == .app || transaction.origin == .appIntent,
-            transaction.planID == nil,
-            let account = transaction.account,
-            account.kind == .creditCard
-        else { return nil }
-        return account.cashbackRate
+        earnsCashback(transaction) ? transaction.account?.cashbackRate : nil
     }
 
     /// Adds cashback for a purchase at `rate`; nothing when it rounds down to zero.
@@ -287,10 +288,11 @@ extension LedgerService {
     }
 
     /// Keeps a purchase's cashback in step after an edit. On the same card it's recalculated at
-    /// the rate it was earned at; moved off the card or no longer an expense, it's removed; moved
-    /// onto a card with cashback, it's added at that card's rate.
+    /// the rate it was earned at, even if the card's rate has changed since; moved off the card or
+    /// no longer an expense, it's removed; moved onto a card with cashback, it's added at that
+    /// card's rate.
     private func updateCashback(_ cashback: LedgerTransaction?, for purchase: LedgerTransaction, previousAccountID: UUID?) {
-        guard let currentRate = cashbackRate(for: purchase) else {
+        guard earnsCashback(purchase) else {
             if let cashback { context.delete(cashback) }
             return
         }
@@ -298,7 +300,9 @@ extension LedgerService {
         if let cashback {
             guard sameAccount, let earnedPPM = cashback.basisRatePPM else {
                 context.delete(cashback)
-                insertCashback(for: purchase, rate: currentRate)
+                if let currentRate = cashbackRate(for: purchase) {
+                    insertCashback(for: purchase, rate: currentRate)
+                }
                 return
             }
             let amountMinor = CashbackCalculator.cashbackMinor(forPurchaseMinor: purchase.amountMinor, rate: Rate(partsPerMillion: earnedPPM))
@@ -310,7 +314,7 @@ extension LedgerService {
             cashback.basisMinor = purchase.amountMinor
             cashback.occurredAt = purchase.occurredAt
             cashback.updatedAt = now
-        } else if !sameAccount {
+        } else if !sameAccount, let currentRate = cashbackRate(for: purchase) {
             insertCashback(for: purchase, rate: currentRate)
         }
     }
