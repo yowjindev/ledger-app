@@ -114,10 +114,8 @@ struct DashboardView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(transactions.prefix(Self.recentLimit)) { transaction in
-                    NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-                        TransactionRow(transaction: transaction, showsDate: true)
-                    }
+                ForEach(HistoryItem.items(from: transactions).prefix(Self.recentLimit)) { item in
+                    HistoryItemLink(item: item, showsDate: true)
                 }
             }
         } header: {

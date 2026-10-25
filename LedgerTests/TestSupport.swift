@@ -37,15 +37,20 @@ final class LedgerHarness {
 
     var context: ModelContext { container.mainContext }
 
-    init(clock: TestClock = TestClock()) throws {
+    init(clock: TestClock = TestClock(), calendar: Calendar = .current) throws {
         self.container = try LedgerStore.makeContainer(storage: .inMemory)
         self.clock = clock
-        self.ledger = LedgerService(context: container.mainContext, clock: { clock.now })
+        self.ledger = LedgerService(context: container.mainContext, clock: { clock.now }, calendar: calendar)
     }
 
     /// A service over the same context whose saves always fail, as if storage were full.
     func failingLedger() -> LedgerService {
-        LedgerService(context: context, clock: { [clock] in clock.now }, persist: { _ in throw SimulatedSaveFailure() })
+        LedgerService(
+            context: context,
+            clock: { [clock] in clock.now },
+            calendar: ledger.calendar,
+            persist: { _ in throw SimulatedSaveFailure() }
+        )
     }
 
     @discardableResult

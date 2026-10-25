@@ -52,10 +52,10 @@ struct TransactionDraft: Equatable, Sendable {
 
 extension TransactionDraft {
     /// A draft prefilled from an existing transaction, for editing. `nil` if the transaction's
-    /// kind is unknown to this app version.
+    /// kind is unknown to this app version or the entry isn't editable.
     @MainActor
     init?(_ transaction: LedgerTransaction) {
-        guard let kind = transaction.kind else { return nil }
+        guard let kind = transaction.kind, transaction.isEditable else { return nil }
         self.init(
             kind: kind,
             amount: transaction.amount.amount,
@@ -182,6 +182,7 @@ extension LedgerService {
         guard transaction.modelContext != nil, !transaction.isDeleted else {
             throw LedgerError.transactionNotFound
         }
+        guard transaction.isEditable else { throw LedgerError.entryNotEditable }
         let resolved = try resolve(draft, editing: transaction)
         transaction.kindRaw = resolved.kind.rawValue
         transaction.amountMinor = resolved.amountMinor
@@ -281,6 +282,8 @@ extension LedgerService {
                 note: note,
                 reference: reference
             )
+        case .adjustment:
+            throw LedgerError.entryNotEditable
         }
     }
 
@@ -304,6 +307,8 @@ extension LedgerService {
             return transaction.category?.id == draft.categoryID
         case .transfer:
             return transaction.destinationAccount?.id == draft.destinationAccountID
+        case .adjustment:
+            return false
         }
     }
 

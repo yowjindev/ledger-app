@@ -23,10 +23,8 @@ struct AccountTransactionsView: View {
             List {
                 ForEach(AccountHistoryMonth.groups(of: history)) { group in
                     Section(group.title) {
-                        ForEach(group.transactions) { transaction in
-                            NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-                                TransactionRow(transaction: transaction, showsDate: true)
-                            }
+                        ForEach(HistoryItem.items(from: group.transactions)) { item in
+                            HistoryItemLink(item: item, showsDate: true, accountID: accountID)
                         }
                     }
                 }

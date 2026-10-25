@@ -37,6 +37,11 @@ iPhone.
   binary floating point.
 - **Expenses, income and transfers.** A transfer moves money between your own accounts, counts as
   neither income nor an expense, and is saved in one step so it can't be half-recorded.
+- **Balance adjustments.** Type what an account really holds and Ledger records the difference
+  as one adjustment. It changes the balance but never counts as income or spending.
+- **Daily interest.** Give a savings account its annual rate and withholding tax, and Ledger adds
+  each day's interest and tax at 1:00 AM the next day, as one row per day. If Ledger hasn't run
+  for a while, it catches up on the missed days the next time it does.
 - **Duplicate protection.** A double tap saves once, and an entry identical to one from the last
   two minutes asks before saving again.
 - **Log from bank emails.** A Shortcuts automation can pass a bank's email to Ledger, which reads
@@ -59,7 +64,7 @@ iOS reserves this setting for you, so Ledger can't set it up itself.
 
 1. Install Ledger and open it once.
 2. Open **Settings → Action Button** and swipe to **Shortcut**.
-3. Tap **Choose a Shortcut**, find **Ledger**, and pick **Ledger Menu** (all four actions) or
+3. Tap **Choose a Shortcut**, find **Ledger**, and pick **Ledger Menu** (all five actions) or
    **Log Expense** (fastest for everyday spending).
 
 The Action Button needs an iPhone 15 Pro or later. Everything else works on any iPhone running
@@ -107,14 +112,16 @@ in the Shortcuts app.
 
 | Shortcut | What it does | Example Siri phrase |
 |---|---|---|
-| **Ledger Menu** | Choose Expense, Income, Transfer or Check Balances, then continue | "Ledger menu" |
+| **Ledger Menu** | Choose Expense, Income, Transfer, Check Balances or Update Balance, then continue | "Ledger menu" |
 | **Log Expense** | Amount → category → account → saved | "Log an expense in Ledger" |
 | **Log Income** | Amount → income source → account → saved | "Log income in Ledger" |
 | **Transfer Money** | Amount → from → to → confirm → saved | "Transfer money in Ledger" |
 | **Check Balances** | Each active account and the total liquid balance (read-only) | "Check my Ledger balances" |
 
-- **Confirmation** is always asked for transfers. For expenses and income it's asked only when
-  the entry repeats one from the last two minutes or is ₱100,000 or more.
+- **Confirmation** is always asked for transfers and balance updates. For expenses and income
+  it's asked only when the entry repeats one from the last two minutes or is ₱100,000 or more.
+- **Update Balance** asks for the account, then its real balance. Because Shortcuts sends 0 for an
+  empty amount, a real balance of exactly ₱0 has to be entered in the app.
 - **Cancelling** at any step saves nothing. An invalid amount (zero, or more than two decimals) is
   asked for again with the reason.
 - **Locked iPhone:** iOS asks for Face ID or the passcode first, because the actions read or
@@ -169,7 +176,7 @@ success message.
 ### Balances
 
 ```
-current balance = opening balance + income + transfers in − expenses − transfers out
+current balance = opening balance + income + transfers in − expenses − transfers out ± adjustments
 ```
 
 - An account whose opening balance hasn't been entered has **no** current balance. Ledger shows
@@ -178,6 +185,28 @@ current balance = opening balance + income + transfers in − expenses − trans
   Onboarding asks what each account holds **now** and works out the opening balance, so entries
   logged earlier aren't counted twice.
 - Archived accounts keep their history but are left out of the total liquid balance.
+- **Update Balance** compares the real balance you type with Ledger's and records one adjustment
+  for the difference. Adjustments are left out of income, spending and net totals. For an account
+  with no opening balance yet, it sets the opening balance instead.
+
+### Daily interest
+
+```
+interest = day's ending balance × annual rate ÷ 360, rounded up to the centavo
+tax      = interest × withholding tax rate (20% by default), rounded to the nearest centavo
+```
+
+- Each day's interest and tax are recorded as two entries dated 1:00 AM the next day, the way
+  banks credit them, so each day's interest earns interest from the next day on. Lists show them
+  as one row, and tapping it shows the balance, rate, interest and tax for each account.
+- Ledger has no server, so it posts interest when it runs: when the app comes to the foreground,
+  at 1:00 AM while it's open, and before any shortcut reads or changes data. Missed days are
+  posted in order, in one save, and never twice.
+- Interest starts the day it's turned on. A rate change applies to every day not yet posted, and
+  days with an unknown, zero or negative balance earn nothing. Posted interest stays as it is,
+  even if an earlier entry is logged later; the next Update Balance absorbs the difference.
+- The formula was inferred from one bank's statements. If yours rounds differently, Update Balance
+  brings the account back in line.
 
 ### Accounts and categories
 
@@ -206,10 +235,11 @@ xcodebuild -project Ledger.xcodeproj -scheme Ledger \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-181 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
+249 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
 real data. They cover balances after every kind of change, transfers, edits and deletes, failed
-saves, exact arithmetic, archiving, duplicate protection, unset opening balances, amount parsing
-and formatting, the bank-email reader, and the App Intent flows.
+saves, exact arithmetic, archiving, duplicate protection, unset opening balances, balance
+adjustments, daily interest and its catch-up, the schema migration, amount parsing and formatting,
+the bank-email reader, and the App Intent flows.
 
 The optional **LedgerShortcutsUITests** scheme drives Apple's Shortcuts app in the simulator. It
 checks that the App Shortcuts are registered, runs Check Balances, walks the prompts, cancels
@@ -265,6 +295,7 @@ what has been verified where.
 | App screens | Run and checked in light mode, dark mode and large text |
 | Ledger Menu, Log Expense and Check Balances on an iPhone | Run on an iPhone 16 Pro |
 | Result list | Checked in the simulator in light and dark |
+| Balance adjustments and daily interest | Unit-tested; screens checked in the simulator in light and dark; not yet run on an iPhone |
 | Log Income, Transfer Money, Log From Message on a device | Not tried yet; covered by unit tests that drive the same flow code |
 
 **Limitations:** one currency (PHP); no export, import or sync; no widgets or Apple Watch app;

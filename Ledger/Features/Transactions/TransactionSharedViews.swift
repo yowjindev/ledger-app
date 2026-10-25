@@ -66,7 +66,7 @@ struct AddTransactionMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(TransactionKind.allCases) { kind in
+            ForEach(TransactionKind.loggable) { kind in
                 Button(kind.title, systemImage: kind.systemImage) {
                     router.addTransaction(kind)
                 }
@@ -86,6 +86,7 @@ enum TransactionLogging {
         switch kind {
         case .expense, .income: activeAccountCount >= 1
         case .transfer: activeAccountCount >= 2
+        case .adjustment: false
         }
     }
 
@@ -103,6 +104,7 @@ enum TransactionLogging {
         switch origin {
         case .app: "Ledger app"
         case .appIntent: "Shortcuts, Siri, or Action Button"
+        case .interest: "Added by Ledger"
         }
     }
 }

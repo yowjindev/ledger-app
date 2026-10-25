@@ -295,6 +295,145 @@ final class IntentFlowTests: XCTestCase {
         XCTAssertEqual(try h.balance(pnb), 10_000)
     }
 
+    // MARK: Update Balance
+
+    func testUpdateBalanceAsksAccountThenBalanceAndConfirms() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
+        var prompts: [String] = []
+        var confirmations: [String] = []
+
+        let outcome = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: nil,
+            amount: nil,
+            askAccount: { prompts.append($0); return AccountEntity(gcash) },
+            askAmount: { prompts.append($0); return self.pesos("121") },
+            confirm: { message, _ in confirmations.append(message) }
+        )
+
+        XCTAssertEqual(prompts, ["Which account do you want to update?", "What's GCash's real balance?"])
+        XCTAssertEqual(confirmations.count, 1)
+        let confirmation = plainSpaces(confirmations[0])
+        XCTAssertTrue(confirmation.hasPrefix("Add a +₱4.00 balance adjustment to GCash?"), confirmation)
+        XCTAssertEqual(try h.balance(gcash), 121)
+        XCTAssertEqual(try h.ledger.transactions().first?.origin, .appIntent)
+        XCTAssertEqual(outcome.headline, "Balance updated")
+        XCTAssertEqual(outcome.rows.map(\.title), ["Balance adjustment", "GCash"])
+        XCTAssertEqual(outcome.rows[0].subtitle, "Adjustment · GCash")
+        XCTAssertEqual(outcome.rows[0].symbolName, TransactionKind.adjustment.systemImage)
+        XCTAssertEqual(outcome.rows[1].subtitle, "New balance")
+        XCTAssertTrue(plainSpaces(outcome.rows[0].value ?? "").contains("+₱4"))
+        let body = plainSpaces(try XCTUnwrap(outcome.body))
+        XCTAssertTrue(body.contains("Balance adjustment · GCash. GCash balance: ₱121"), body)
+        XCTAssertFalse(outcome.text.contains("\n"))
+    }
+
+    func testUpdateBalanceThatMatchesSavesNothing() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
+
+        let outcome = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: AccountEntity(gcash),
+            amount: pesos("117"),
+            askAccount: { _ in throw UnexpectedPrompt() },
+            askAmount: { _ in throw UnexpectedPrompt() },
+            confirm: { _, _ in throw UnexpectedPrompt() }
+        )
+
+        XCTAssertEqual(outcome.headline, "GCash already matches")
+        XCTAssertEqual(outcome.rows.map(\.title), ["GCash"])
+        XCTAssertEqual(try h.transactionCount(), 0)
+    }
+
+    func testUpdateBalanceSetsAMissingOpeningBalance() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: nil, kind: .eWallet)
+        var confirmations: [String] = []
+
+        let outcome = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: AccountEntity(gcash),
+            amount: pesos("121"),
+            askAccount: { _ in throw UnexpectedPrompt() },
+            askAmount: { _ in throw UnexpectedPrompt() },
+            confirm: { message, _ in confirmations.append(message) }
+        )
+
+        XCTAssertEqual(confirmations.map(plainSpaces), ["Set GCash's opening balance so its balance is ₱121.00?"])
+        XCTAssertEqual(gcash.openingBalanceMinor, 12_100)
+        XCTAssertEqual(try h.transactionCount(), 0)
+        XCTAssertEqual(outcome.headline, "Balance updated")
+        XCTAssertEqual(outcome.rows.map(\.title), ["GCash"])
+    }
+
+    func testDecliningAnUpdateSavesNothing() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
+
+        do {
+            _ = try await IntentFlows.updateBalance(
+                in: h.ledger,
+                account: AccountEntity(gcash),
+                amount: pesos("121"),
+                askAccount: { _ in throw UnexpectedPrompt() },
+                askAmount: { _ in throw UnexpectedPrompt() },
+                confirm: { _, _ in throw Declined() }
+            )
+            XCTFail("Declining must stop the update")
+        } catch is Declined {
+            // Expected.
+        }
+        XCTAssertEqual(try h.transactionCount(), 0)
+        XCTAssertEqual(try h.balance(gcash), 117)
+    }
+
+    func testUpdateBalanceAsksAgainForAnEmptyAmount() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
+        var prompts: [String] = []
+
+        _ = try await IntentFlows.updateBalance(
+            in: h.ledger,
+            account: AccountEntity(gcash),
+            amount: 0,
+            askAccount: { _ in throw UnexpectedPrompt() },
+            askAmount: { prompts.append($0); return self.pesos("110") },
+            confirm: { _, _ in }
+        )
+
+        XCTAssertEqual(prompts, ["What's GCash's real balance?"], "The first question carries no error")
+        XCTAssertEqual(try h.balance(gcash), 110)
+    }
+
+    func testUpdateBalanceRefusesAnArchivedAccount() async throws {
+        let h = try LedgerHarness()
+        let gcash = try h.account("GCash", opening: 117, kind: .eWallet)
+        try h.account("PNB", opening: 1_000)
+        try h.ledger.archiveAccount(gcash)
+
+        do {
+            _ = try await IntentFlows.updateBalance(
+                in: h.ledger,
+                account: AccountEntity(gcash),
+                amount: pesos("121"),
+                askAccount: { _ in throw UnexpectedPrompt() },
+                askAmount: { _ in throw UnexpectedPrompt() },
+                confirm: { _, _ in throw UnexpectedPrompt() }
+            )
+            XCTFail("An archived account can't be updated")
+        } catch let error as LedgerIntentError {
+            XCTAssertEqual(error, .ledger(.accountArchived(name: "GCash")))
+        }
+        XCTAssertEqual(try h.transactionCount(), 0)
+    }
+
+    func testMenuOffersUpdateBalance() {
+        XCTAssertEqual(LedgerAction.allCases.last, .updateBalance)
+        XCTAssertNotNil(LedgerAction.caseDisplayRepresentations[.updateBalance])
+    }
+
     func testFlowsExplainMissingSetup() async throws {
         let h = try LedgerHarness()
         let only = try h.account("Wallet", opening: 100, kind: .cash)

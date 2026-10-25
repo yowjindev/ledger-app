@@ -48,7 +48,18 @@ enum SampleData {
                     if let destination = accounts[other] {
                         try ledger.recordTransfer(amount: amount, fromAccountID: account.id, toAccountID: destination.id, occurredAt: hoursAgo(age))
                     }
+                case .adjustment:
+                    break
                 }
+            }
+            // PNB earns interest from three days ago, so its daily interest rows appear at once.
+            if let pnb = accounts["PNB"] {
+                let threeDaysAgo = LedgerService(context: context, clock: { hoursAgo(72) })
+                try threeDaysAgo.setInterest(
+                    InterestTerms(annualRate: Rate(partsPerMillion: 32_500), taxRate: InterestTerms.defaultTaxRate),
+                    for: pnb
+                )
+                try ledger.postDueInterest()
             }
         } catch {
             Log.persistence.error("Could not load sample data: \(String(describing: error), privacy: .private)")

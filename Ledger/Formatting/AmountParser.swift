@@ -64,9 +64,12 @@ enum AmountParser {
     /// Text for editing an existing amount: ASCII digits, no grouping, the locale's decimal
     /// separator, and no trailing zeros beyond what the amount needs, so `sanitize` keeps it as is
     /// and `parse` reads it back.
-    static func editableText(for amount: Decimal, locale: Locale = .autoupdatingCurrent) -> String {
+    static func editableText(for amount: Decimal, locale: Locale = .autoupdatingCurrent, maximumFractionDigits: Int = 2) -> String {
         let text = amount.formatted(
-            .number.locale(Locale(identifier: "en_US_POSIX")).grouping(.never).precision(.fractionLength(0...2))
+            .number
+                .locale(Locale(identifier: "en_US_POSIX"))
+                .grouping(.never)
+                .precision(.fractionLength(0...maximumFractionDigits))
         )
         let decimalSeparator = locale.decimalSeparator ?? "."
         return decimalSeparator == "." ? text : text.replacingOccurrences(of: ".", with: decimalSeparator)

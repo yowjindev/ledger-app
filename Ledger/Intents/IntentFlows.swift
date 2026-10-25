@@ -219,6 +219,77 @@ enum IntentFlows {
         )
     }
 
+    /// Brings an account to its real balance: asks for the account and the balance, then asks
+    /// before recording an adjustment for the difference, or setting the opening balance when it
+    /// isn't known. Records nothing when Ledger's balance already matches.
+    static func updateBalance(
+        in ledger: LedgerService,
+        account: AccountEntity?,
+        amount: Double?,
+        askAccount: Ask<AccountEntity>,
+        askAmount: Ask<Double>,
+        confirm: Confirm
+    ) async throws -> IntentOutcome {
+        try requireAccounts(1, in: ledger)
+        let accountID = try await resolve(account?.id) { try await askAccount("Which account do you want to update?").id }
+        guard let target = try ledger.account(id: accountID) else { throw LedgerIntentError.ledger(.accountNotFound) }
+        guard !target.isArchived else { throw LedgerIntentError.ledger(.accountArchived(name: target.name)) }
+        let value = try await resolveAmount(amount, prompt: "What's \(target.name)'s real balance?", ask: askAmount)
+
+        let formatter = MoneyFormatter.current()
+        let realBalance = formatter.string(Money(value, currency: target.currency), alwaysShowCentavos: true)
+        switch try IntentLedger.perform({ try ledger.balanceCorrection(toReach: value, for: target) }) {
+        case .alreadyMatches:
+            return IntentOutcome(
+                headline: "\(target.name) already matches",
+                body: "\(target.name) balance: \(realBalance)",
+                bodyIsSentence: true,
+                rows: [balanceRow(for: target, value: realBalance, subtitle: "Balance")]
+            )
+        case .adjustment(let difference):
+            let change = formatter.string(difference, sign: .always, alwaysShowCentavos: true)
+            try await confirm("Add a \(change) balance adjustment to \(target.name)?", .continue)
+        case .setOpeningBalance:
+            try await confirm("Set \(target.name)'s opening balance so its balance is \(realBalance)?", .continue)
+        }
+
+        let applied = try IntentLedger.perform { try ledger.updateBalance(of: target, to: value, origin: .appIntent) }
+        Log.intents.info("Updated a balance from an App Intent")
+        let current = (try? ledger.balance(of: target))?.currentBalance.map { formatter.string($0, alwaysShowCentavos: true) }
+        let balanceLine = "\(target.name) balance: \(current ?? realBalance)"
+        let balance = balanceRow(for: target, value: current ?? realBalance, subtitle: "New balance")
+        switch applied {
+        case .adjustment(let difference):
+            let change = formatter.string(difference, sign: .always, alwaysShowCentavos: true)
+            let adjustment = ResultRow(
+                id: UUID(),
+                symbolName: TransactionKind.adjustment.systemImage,
+                title: TransactionSummary.adjustmentTitle,
+                subtitle: "\(TransactionKind.adjustment.title) · \(target.name)",
+                value: change
+            )
+            return IntentOutcome(
+                headline: "Balance updated",
+                body: "\(change) · \(TransactionSummary.adjustmentTitle) · \(target.name). \(balanceLine)",
+                rows: [adjustment, balance]
+            )
+        case .setOpeningBalance(let opening):
+            let openingText = formatter.string(opening, alwaysShowCentavos: true)
+            return IntentOutcome(
+                headline: "Balance updated",
+                body: "\(target.name)'s opening balance is \(openingText). \(balanceLine)",
+                bodyIsSentence: true,
+                rows: [balance]
+            )
+        case .alreadyMatches:
+            return IntentOutcome(headline: "\(target.name) already matches", body: balanceLine, bodyIsSentence: true, rows: [balance])
+        }
+    }
+
+    private static func balanceRow(for account: Account, value: String, subtitle: String) -> ResultRow {
+        ResultRow(id: account.id, symbolName: account.kind.systemImage, title: account.name, subtitle: subtitle, value: value)
+    }
+
     // MARK: Amounts
 
     /// Returns a valid peso amount, asking again with an explanation when the entry is invalid.
@@ -313,6 +384,9 @@ enum IntentFlows {
                     try await confirm((notes + ["Save it?"]).joined(separator: " "), .log)
                 }
             }
+        case .adjustment:
+            // `resolve` refuses adjustments, so they never reach this point.
+            break
         }
 
         let transaction = try IntentLedger.perform {

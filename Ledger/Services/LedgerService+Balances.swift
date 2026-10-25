@@ -67,11 +67,12 @@ extension AccountSnapshot {
 }
 
 extension Movement {
-    /// `nil` for records whose kind or status this app version doesn't know; they are left out
-    /// of calculations rather than guessed at.
+    /// `nil` for records whose kind or status this app version doesn't know, and for adjustments
+    /// without a readable direction; they are left out of calculations rather than guessed at.
     @MainActor
     init?(_ transaction: LedgerTransaction) {
         guard let kind = transaction.kind, let status = transaction.status else { return nil }
+        if kind == .adjustment, transaction.adjustmentDirection == nil { return nil }
         self.init(
             kind: kind,
             status: status,
@@ -79,7 +80,8 @@ extension Movement {
             currency: transaction.currency,
             accountID: transaction.account?.id,
             destinationAccountID: transaction.destinationAccount?.id,
-            occurredAt: transaction.occurredAt
+            occurredAt: transaction.occurredAt,
+            direction: transaction.adjustmentDirection
         )
     }
 }

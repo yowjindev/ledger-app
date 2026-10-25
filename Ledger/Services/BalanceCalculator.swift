@@ -22,6 +22,28 @@ struct Movement: Hashable, Sendable {
     let accountID: UUID?
     let destinationAccountID: UUID?
     let occurredAt: Date
+    /// For adjustments, whether the balance went up or down; `nil` for other kinds.
+    let direction: AdjustmentDirection?
+
+    init(
+        kind: TransactionKind,
+        status: TransactionStatus,
+        amountMinor: Int64,
+        currency: CurrencyCode,
+        accountID: UUID?,
+        destinationAccountID: UUID?,
+        occurredAt: Date,
+        direction: AdjustmentDirection? = nil
+    ) {
+        self.kind = kind
+        self.status = status
+        self.amountMinor = amountMinor
+        self.currency = currency
+        self.accountID = accountID
+        self.destinationAccountID = destinationAccountID
+        self.occurredAt = occurredAt
+        self.direction = direction
+    }
 }
 
 /// An account's balance derived from its opening balance and posted transactions.
@@ -31,6 +53,8 @@ struct AccountBalance: Identifiable, Hashable, Sendable {
     let expenses: Money
     let transfersIn: Money
     let transfersOut: Money
+    /// Net of balance adjustments: increases minus decreases.
+    let adjustments: Money
 
     var id: UUID { account.id }
 
@@ -39,8 +63,9 @@ struct AccountBalance: Identifiable, Hashable, Sendable {
         account.openingBalanceMinor.map { Money(minorUnits: $0, currency: account.currency) }
     }
 
-    /// Net change from recorded transactions: income + transfers in − expenses − transfers out.
-    var netActivity: Money { income + transfersIn - expenses - transfersOut }
+    /// Net change from recorded transactions:
+    /// income + transfers in − expenses − transfers out ± adjustments.
+    var netActivity: Money { income + transfersIn - expenses - transfersOut + adjustments }
 
     /// Opening balance plus net activity. `nil` while the opening balance is unknown, because
     /// the current balance can't be known either.
@@ -90,8 +115,8 @@ struct PeriodSummary: Hashable, Sendable {
 /// Pure financial calculations over immutable snapshots. No persistence access, so the same
 /// arithmetic serves the app, App Intents, and tests.
 enum BalanceCalculator {
-    /// Computes each account's balance:
-    /// opening balance + posted income + incoming transfers − posted expenses − outgoing transfers.
+    /// Computes each account's balance: opening balance + posted income + incoming transfers
+    /// − posted expenses − outgoing transfers ± adjustments.
     ///
     /// Each posted transaction affects each involved account exactly once. A movement is applied
     /// only to accounts that use the same currency as the movement.
@@ -114,6 +139,15 @@ enum BalanceCalculator {
             case .transfer:
                 apply(amount, to: movement.accountID, currency: movement.currency, \.transfersOut)
                 apply(amount, to: movement.destinationAccountID, currency: movement.currency, \.transfersIn)
+            case .adjustment:
+                switch movement.direction {
+                case .increase:
+                    apply(amount, to: movement.accountID, currency: movement.currency, \.adjustmentsIn)
+                case .decrease:
+                    apply(amount, to: movement.accountID, currency: movement.currency, \.adjustmentsOut)
+                case nil:
+                    break
+                }
             }
         }
 
@@ -124,7 +158,8 @@ enum BalanceCalculator {
                 income: Money(accountTotals.income, currency: account.currency),
                 expenses: Money(accountTotals.expenses, currency: account.currency),
                 transfersIn: Money(accountTotals.transfersIn, currency: account.currency),
-                transfersOut: Money(accountTotals.transfersOut, currency: account.currency)
+                transfersOut: Money(accountTotals.transfersOut, currency: account.currency),
+                adjustments: Money(accountTotals.adjustmentsIn - accountTotals.adjustmentsOut, currency: account.currency)
             )
         }
     }
@@ -157,6 +192,7 @@ enum BalanceCalculator {
     }
 
     /// Posted income and expenses in `currency` that occurred in `[interval.start, interval.end)`.
+    /// Transfers and adjustments are neither.
     static func periodSummary(movements: [Movement], in interval: DateInterval, currency: CurrencyCode) -> PeriodSummary {
         var income = Decimal.zero
         var expenses = Decimal.zero
@@ -175,7 +211,7 @@ enum BalanceCalculator {
             case .expense:
                 expenses += amount
                 expenseCount += 1
-            case .transfer:
+            case .transfer, .adjustment:
                 break
             }
         }
@@ -198,5 +234,7 @@ enum BalanceCalculator {
         var expenses = Decimal.zero
         var transfersIn = Decimal.zero
         var transfersOut = Decimal.zero
+        var adjustmentsIn = Decimal.zero
+        var adjustmentsOut = Decimal.zero
     }
 }

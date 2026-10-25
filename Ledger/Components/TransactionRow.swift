@@ -7,55 +7,85 @@ struct TransactionRow: View {
     var showsDate = false
 
     @Environment(\.moneyFormatter) private var formatter
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let summary = TransactionSummary(transaction)
+        HistoryRowLayout(
+            symbolName: summary.symbolName,
+            tint: LedgerTheme.badgeTint(for: summary.kind),
+            title: summary.title,
+            accountLine: summary.accountLine,
+            occurredAt: summary.occurredAt,
+            amountText: summary.signedAmountText(formatter: formatter),
+            amountColor: LedgerTheme.amountColor(for: summary.kind),
+            caption: summary.kind?.title ?? "",
+            accessibilityLabel: summary.accessibilityLabel(formatter: formatter),
+            showsDate: showsDate
+        )
+    }
+}
+
+/// The layout of a history row: symbol, title, account and time, then the signed amount over a caption.
+struct HistoryRowLayout: View {
+    let symbolName: String
+    let tint: Color
+    let title: String
+    let accountLine: String
+    let occurredAt: Date
+    let amountText: String
+    let amountColor: Color
+    let caption: String
+    let accessibilityLabel: String
+    var showsDate = false
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
         HStack(spacing: 12) {
-            SymbolBadge(systemName: summary.symbolName, tint: LedgerTheme.badgeTint(for: summary.kind))
+            SymbolBadge(systemName: symbolName, tint: tint)
             if dynamicTypeSize.isAccessibilitySize {
                 // Stacked so the amount gets the full width and never breaks mid-number.
                 VStack(alignment: .leading, spacing: 4) {
-                    details(summary)
+                    details
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        amount(summary)
-                        kind(summary)
+                        amount
+                        captionText
                     }
                 }
             } else {
-                details(summary)
+                details
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
-                    amount(summary)
-                    kind(summary)
+                    amount
+                    captionText
                 }
             }
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(summary.accessibilityLabel(formatter: formatter))
+        .accessibilityLabel(accessibilityLabel)
     }
 
-    private func details(_ summary: TransactionSummary) -> some View {
+    private var details: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(summary.title)
+            Text(title)
                 .font(.body)
                 .lineLimit(1)
             // The account name gives way before the date and time, which are never cut off;
             // when even that doesn't fit, they move to a second line.
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 4) {
-                    Text(summary.accountLine)
+                    Text(accountLine)
                         .lineLimit(1)
                     Text("·")
-                    Text(when(summary.occurredAt))
+                    Text(when)
                         .lineLimit(1)
                         .fixedSize()
                 }
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(summary.accountLine)
+                    Text(accountLine)
                         .lineLimit(1)
-                    Text(when(summary.occurredAt))
+                    Text(when)
                 }
             }
             .font(.subheadline)
@@ -63,29 +93,29 @@ struct TransactionRow: View {
         }
     }
 
-    private func amount(_ summary: TransactionSummary) -> some View {
-        Text(summary.signedAmountText(formatter: formatter))
+    private var amount: some View {
+        Text(amountText)
             .font(.body.weight(.semibold))
             .monospacedDigit()
-            .foregroundStyle(LedgerTheme.amountColor(for: summary.kind))
+            .foregroundStyle(amountColor)
             .lineLimit(1)
             .minimumScaleFactor(0.5)
     }
 
-    private func kind(_ summary: TransactionSummary) -> some View {
-        Text(summary.kind?.title ?? "")
+    private var captionText: some View {
+        Text(caption)
             .font(.caption)
             .foregroundStyle(.secondary)
     }
 
     /// Time only, or a short date and time when `showsDate` is set; the year appears only for
     /// earlier years.
-    private func when(_ date: Date) -> String {
-        guard showsDate else { return date.formatted(date: .omitted, time: .shortened) }
-        let isThisYear = Calendar.current.isDate(date, equalTo: .now, toGranularity: .year)
+    private var when: String {
+        guard showsDate else { return occurredAt.formatted(date: .omitted, time: .shortened) }
+        let isThisYear = Calendar.current.isDate(occurredAt, equalTo: .now, toGranularity: .year)
         let style: Date.FormatStyle = isThisYear
             ? .dateTime.month(.abbreviated).day().hour().minute()
             : .dateTime.month(.abbreviated).day().year().hour().minute()
-        return date.formatted(style)
+        return occurredAt.formatted(style)
     }
 }

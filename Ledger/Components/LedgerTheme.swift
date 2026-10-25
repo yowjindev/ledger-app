@@ -12,7 +12,7 @@ enum LedgerTheme {
         switch kind {
         case .income: income
         case .expense: .primary
-        case .transfer, nil: .secondary
+        case .transfer, .adjustment, nil: .secondary
         }
     }
 
@@ -21,6 +21,7 @@ enum LedgerTheme {
         switch kind {
         case .income: income
         case .transfer: transfer
+        case .adjustment: .secondary
         // The asset color, not `.accentColor`: snippets drawn outside the app don't inherit
         // the app's accent and would fall back to blue.
         case .expense, nil: Color(.accent)

@@ -68,16 +68,17 @@ struct TransactionFilter: Equatable, Sendable {
 enum TransactionSearch {
     private static let posix = Locale(identifier: "en_US_POSIX")
 
-    /// Whether `transaction` matches `query`. Matches the category or income source, both
-    /// accounts of a transfer, the note, the reference, the type, and the amount (see
-    /// `amount(_:matches:)`). An empty query matches everything.
+    /// Whether `transaction` matches `query`. Matches the category or income source, the title
+    /// of entries without one (such as Interest), both accounts of a transfer, the note, the
+    /// reference, the type, and the amount (see `amount(_:matches:)`). An empty query matches
+    /// everything.
     @MainActor
     static func matches(_ transaction: LedgerTransaction, query: String, locale: Locale = .autoupdatingCurrent) -> Bool {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return true }
 
         let texts: [String?] = [
-            transaction.category?.name,
+            transaction.category?.name ?? TransactionSummary(transaction).title,
             transaction.account?.name,
             transaction.destinationAccount?.name,
             transaction.note,

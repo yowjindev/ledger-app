@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import os
 
 /// Errors shown by Shortcuts, Siri, and the Action Button. Messages never include balances.
 enum LedgerIntentError: Error, Equatable, CustomLocalizedStringResourceConvertible {
@@ -33,12 +34,22 @@ enum LedgerIntentError: Error, Equatable, CustomLocalizedStringResourceConvertib
 /// use the same container and `LedgerService` as the app.
 @MainActor
 enum IntentLedger {
+    /// The shared ledger, with any daily interest that's due already posted so every intent
+    /// reads and changes up-to-date balances.
     static func service() throws -> LedgerService {
+        let ledger: LedgerService
         do {
-            return LedgerService(context: try LedgerStore.mainContext())
+            ledger = LedgerService(context: try LedgerStore.mainContext())
         } catch {
             throw LedgerIntentError.storeUnavailable
         }
+        do {
+            try ledger.postDueInterest()
+        } catch {
+            // Nothing was saved; the next run tries again.
+            Log.intents.error("Couldn't post daily interest: \(String(describing: error), privacy: .private)")
+        }
+        return ledger
     }
 
     /// Runs a ledger operation, presenting `LedgerError`s with their user-facing messages.

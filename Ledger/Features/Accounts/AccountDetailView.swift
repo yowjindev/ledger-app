@@ -4,7 +4,7 @@ import SwiftUI
 /// One account: its current balance and how it's derived, its transactions, and account actions.
 /// Looks the account up by ID, so it copes with the account being deleted elsewhere.
 struct AccountDetailView: View {
-    /// Transactions listed here before linking to the full history.
+    /// History rows listed here before linking to the full history.
     static let recentTransactionLimit = 50
 
     let accountID: UUID
@@ -16,6 +16,8 @@ struct AccountDetailView: View {
     @Query private var matches: [Account]
     @Query(sort: LedgerService.newestFirst) private var transactions: [LedgerTransaction]
     @State private var editor: AccountEditorPresentation?
+    @State private var isUpdatingBalance = false
+    @State private var isEditingInterest = false
     @State private var isConfirmingArchive = false
     @State private var isConfirmingDelete = false
     /// Set once this screen deleted the account, while it closes.
@@ -52,6 +54,9 @@ struct AccountDetailView: View {
                 header(balance)
             }
             breakdownSection(balance)
+            if !account.isArchived {
+                interestSection(account)
+            }
             transactionsSection(history)
             actionsSection(account: account, balance: balance, hasTransactions: !history.isEmpty)
         }
@@ -66,6 +71,12 @@ struct AccountDetailView: View {
         }
         .sheet(item: $editor) { presentation in
             AccountEditorView(account: account, initialFocus: presentation.focus)
+        }
+        .sheet(isPresented: $isUpdatingBalance) {
+            UpdateBalanceView(account: account)
+        }
+        .sheet(isPresented: $isEditingInterest) {
+            AccountInterestEditorView(account: account)
         }
         .ledgerAlert($alert)
     }
@@ -141,6 +152,7 @@ struct AccountDetailView: View {
             LabeledContent("Transfers In") { signedAmount(balance.transfersIn) }
             LabeledContent("Expenses") { signedAmount(-balance.expenses) }
             LabeledContent("Transfers Out") { signedAmount(-balance.transfersOut) }
+            LabeledContent("Adjustments") { signedAmount(balance.adjustments) }
             LabeledContent("Net Activity") { signedAmount(balance.netActivity) }
             LabeledContent("Current Balance") {
                 if let current = balance.currentBalance {
@@ -158,18 +170,36 @@ struct AccountDetailView: View {
         }
     }
 
-    private func transactionsSection(_ history: [LedgerTransaction]) -> some View {
+    private func interestSection(_ account: Account) -> some View {
         Section {
-            if history.isEmpty {
+            Button {
+                isEditingInterest = true
+            } label: {
+                LabeledContent {
+                    Text(AccountsCopy.interestSummary(account.interestTerms))
+                } label: {
+                    Label("Interest", systemImage: TransactionSummary.interestSymbolName)
+                }
+            }
+            .tint(.primary)
+        } footer: {
+            if account.interestTerms != nil {
+                Text(AccountsCopy.interestFooter)
+            }
+        }
+    }
+
+    private func transactionsSection(_ history: [LedgerTransaction]) -> some View {
+        let items = HistoryItem.items(from: history)
+        return Section {
+            if items.isEmpty {
                 Text("No transactions yet")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(history.prefix(Self.recentTransactionLimit)) { transaction in
-                    NavigationLink(value: LedgerRoute.transaction(transaction.id)) {
-                        TransactionRow(transaction: transaction, showsDate: true)
-                    }
+                ForEach(items.prefix(Self.recentTransactionLimit)) { item in
+                    HistoryItemLink(item: item, showsDate: true, accountID: accountID)
                 }
-                if history.count > Self.recentTransactionLimit {
+                if items.count > Self.recentTransactionLimit {
                     NavigationLink {
                         AccountTransactionsView(accountID: accountID)
                     } label: {
@@ -178,7 +208,7 @@ struct AccountDetailView: View {
                 }
             }
         } header: {
-            Text(history.count > Self.recentTransactionLimit ? "Latest Transactions" : "Transactions")
+            Text(items.count > Self.recentTransactionLimit ? "Latest Transactions" : "Transactions")
         }
     }
 
@@ -189,6 +219,9 @@ struct AccountDetailView: View {
                     unarchive(account)
                 }
             } else {
+                Button("Update Balance", systemImage: "plus.forwardslash.minus") {
+                    isUpdatingBalance = true
+                }
                 Button("Add Transaction", systemImage: "plus.circle") {
                     router.addTransaction(.expense, accountID: accountID)
                 }

@@ -144,6 +144,7 @@ enum LedgerAction: String, AppEnum, CaseIterable {
     case income
     case transfer
     case balances
+    case updateBalance
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Ledger Action")
 
@@ -171,6 +172,12 @@ enum LedgerAction: String, AppEnum, CaseIterable {
             subtitle: "See what each account holds",
             image: DisplayRepresentation.Image(systemName: "banknote.fill"),
             synonyms: ["Balances", "Balance"]
+        ),
+        .updateBalance: DisplayRepresentation(
+            title: "Update Balance",
+            subtitle: "Match an account to its real balance",
+            image: DisplayRepresentation.Image(systemName: "plus.forwardslash.minus"),
+            synonyms: ["Adjust balance", "Real balance"]
         ),
     ]
 }

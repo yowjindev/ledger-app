@@ -10,6 +10,13 @@ extension Account {
     }
 
     var hasOpeningBalance: Bool { openingBalanceMinor != nil }
+
+    /// How the account earns interest, or `nil` when it doesn't.
+    var interestTerms: InterestTerms? {
+        interestRatePPM.map {
+            InterestTerms(annualRate: Rate(partsPerMillion: $0), taxRate: Rate(partsPerMillion: interestTaxRatePPM))
+        }
+    }
 }
 
 extension LedgerCategory {
@@ -24,4 +31,10 @@ extension LedgerTransaction {
     var origin: EntryOrigin { EntryOrigin(rawValue: originRaw) ?? .app }
     var currency: CurrencyCode { CurrencyCode(rawValue: currencyCode) }
     var amount: Money { Money(minorUnits: amountMinor, currency: currency) }
+    /// Whether an adjustment raised or lowered the balance; `nil` for other kinds.
+    var adjustmentDirection: AdjustmentDirection? { directionRaw.flatMap(AdjustmentDirection.init) }
+
+    /// Whether the transaction editor may change this entry. Adjustments and automatic interest
+    /// entries are corrected with Update Balance instead.
+    var isEditable: Bool { kind != .adjustment && origin != .interest }
 }
