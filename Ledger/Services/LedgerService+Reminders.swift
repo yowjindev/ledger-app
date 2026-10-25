@@ -43,10 +43,12 @@ extension LedgerService {
         Log.ledger.info("Changed a strict reminder setting")
     }
 
-    /// The day a varying bill usually arrives before its due date in `status`'s cycle.
+    /// The day a varying bill usually arrives for `status`'s cycle: in the due date's month when its
+    /// arrival day comes before its due day, otherwise in the month before. Days past a month's end
+    /// mean its last day.
     private func arrivalDay(of bill: Bill, for status: DueStatus) -> CalendarDay? {
         guard let arrivesDay = bill.arrivesDay else { return nil }
-        let sameMonth = status.cycle.day(arrivesDay)
-        return sameMonth < status.originalDueDate ? sameMonth : status.cycle.adding(months: -1).day(arrivesDay)
+        let month = arrivesDay < bill.dueDay ? status.cycle : status.cycle.adding(months: -1)
+        return month.day(arrivesDay)
     }
 }

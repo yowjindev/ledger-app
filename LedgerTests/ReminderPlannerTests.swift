@@ -225,6 +225,23 @@ final class ReminderPlannerTests: XCTestCase {
 
     // MARK: Items from the ledger
 
+    func testArrivalDayInAShortMonthStaysInTheSameMonth() throws {
+        let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
+        h.clock.now = try instant("2026-02-10T10:00:00+08:00")
+        let utilities = try h.expenseCategory("Utilities")
+        try h.ledger.createBill(BillTerms(
+            name: "Water", categoryID: utilities.id, dueDay: 31, amount: nil, arrivesDay: 30, payFromAccountID: nil
+        ))
+
+        let water = try XCTUnwrap(try h.ledger.reminderItems().first)
+        XCTAssertEqual(water.status.dueDate, CalendarDay(year: 2026, month: 2, day: 28))
+        XCTAssertEqual(water.arrivesDay, CalendarDay(year: 2026, month: 2, day: 28))
+        let arrivals = ReminderPlanner.plan(
+            items: [water], settings: ReminderSettings(), snoozedUntil: [:], now: h.clock.now, calendar: h.ledger.calendar
+        ).notifications.filter { $0.id.contains(".arrives.") }
+        XCTAssertTrue(arrivals.isEmpty, "No month-early run of arrival notices")
+    }
+
     func testReminderItemsFollowComingUp() throws {
         let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
         let card = try h.ledger.createOwedAccount(
