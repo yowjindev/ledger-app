@@ -109,13 +109,19 @@ enum SampleData {
         }
     }
 
-    /// Rent at a fixed amount and electricity whose amount varies. Skips any whose name is
-    /// already taken.
+    /// Rent and internet at fixed amounts, internet due today, and electricity whose amount
+    /// varies. Skips any whose name is already taken.
     private static func loadBills(ledger: LedgerService, expenses: [String: LedgerCategory], payFrom: Account?) throws {
         let existing = Set(try ledger.bills(includeArchived: true).map(\.name))
         if !existing.contains("Rent"), let bills = expenses["Bills"] {
             try ledger.createBill(BillTerms(
                 name: "Rent", categoryID: bills.id, dueDay: 25, amount: 8_000, arrivesDay: nil, payFromAccountID: payFrom?.id
+            ))
+        }
+        // Due today, so the due reminder Live Activity shows in previews and screenshots.
+        if !existing.contains("Internet"), let bills = expenses["Bills"] {
+            try ledger.createBill(BillTerms(
+                name: "Internet", categoryID: bills.id, dueDay: ledger.today.day, amount: 1_699, arrivesDay: nil, payFromAccountID: payFrom?.id
             ))
         }
         if !existing.contains("Electricity"), let bills = expenses["Bills"] {

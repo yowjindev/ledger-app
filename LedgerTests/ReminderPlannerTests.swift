@@ -5,12 +5,13 @@ import XCTest
 /// When each unpaid due is reminded, and how: notifications, or Live Activity starts in strict mode.
 @MainActor
 final class ReminderPlannerTests: XCTestCase {
-    private var calendar = Calendar(identifier: .gregorian)
     private let now = TestClock.referenceDate
-
-    override func setUpWithError() throws {
-        calendar = try fixedCalendar("Asia/Manila")
-    }
+    private let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Manila") ?? .gmt
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        return calendar
+    }()
 
     // MARK: Fixtures
 

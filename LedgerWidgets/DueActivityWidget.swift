@@ -1,4 +1,5 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -11,17 +12,16 @@ struct DueActivityWidget: Widget {
         } dynamicIsland: { context in
             let lines = context.state.lines
             return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    DueSymbol(line: lines.first)
-                        .padding(.leading, 4)
-                }
                 DynamicIslandExpandedRegion(.center) {
                     Text(ReminderCopy.activityTitle(lines))
                         .font(.headline)
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    DueLines(lines: lines, limit: 2)
+                    VStack(spacing: 10) {
+                        DueLines(lines: lines, limit: 2)
+                        DueButtons(first: lines.first)
+                    }
                 }
             } compactLeading: {
                 DueSymbol(line: lines.first)
@@ -62,6 +62,7 @@ private struct DueActivityView: View {
             }
             if family == .medium {
                 DueLines(lines: lines, limit: 3)
+                DueButtons(first: lines.first)
             } else if let first = lines.first {
                 Text(ReminderCopy.line(first))
                     .font(.subheadline)
@@ -115,5 +116,38 @@ private struct DueSymbol: View {
     var body: some View {
         Image(systemName: line?.symbolName ?? "calendar.badge.exclamationmark")
             .foregroundStyle(line?.isOverdue == true ? .red : ReminderStyle.accent)
+    }
+}
+
+/// Paid and Move act on the most urgent due; Snooze hides the whole reminder for a while.
+private struct DueButtons: View {
+    let first: ReminderLine?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let first {
+                Button(intent: PayDueFromReminderIntent(ownerKey: first.ownerKey)) {
+                    Label("Paid", systemImage: "checkmark.circle")
+                }
+            }
+            Button(intent: SnoozeReminderIntent(minutes: 60)) {
+                Label("1 hr", systemImage: "moon.zzz")
+            }
+            .accessibilityLabel("Snooze for 1 hour")
+            Button(intent: SnoozeReminderIntent(minutes: 180)) {
+                Label("3 hr", systemImage: "moon.zzz")
+            }
+            .accessibilityLabel("Snooze for 3 hours")
+            if let first {
+                Button(intent: MoveDueFromReminderIntent(ownerKey: first.ownerKey)) {
+                    Label("Move", systemImage: "calendar")
+                }
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .labelStyle(.titleAndIcon)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(ReminderStyle.accent)
     }
 }

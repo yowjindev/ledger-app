@@ -4,8 +4,9 @@ import UIKit
 import UserNotifications
 import os
 
-/// Applies the reminder plan: replaces Ledger's pending notifications with the ones the plan
-/// calls for. Refreshes after every save, so paying a due removes its reminders at once.
+/// Applies the reminder plan: replaces Ledger's pending notifications and scheduled Live
+/// Activities with the ones the plan calls for, and shows or closes the Live Activity for what's
+/// due now. Refreshes after every save, so paying a due removes its reminders at once.
 @MainActor
 final class ReminderScheduler {
     static let shared = ReminderScheduler()
@@ -45,9 +46,12 @@ final class ReminderScheduler {
             return
         }
         ReminderPreferences.clearSnoozes(except: Set(items.map(\.status.owner.key)))
+        var settings = ReminderPreferences.settings()
+        // Without Live Activities, strict items fall back to notifications.
+        settings.isStrictEnabled = settings.isStrictEnabled && LiveActivities.areEnabled
         let plan = ReminderPlanner.plan(
             items: items,
-            settings: ReminderPreferences.settings(),
+            settings: settings,
             snoozedUntil: ReminderPreferences.snoozes(now: ledger.now),
             now: ledger.now,
             calendar: ledger.calendar
@@ -56,6 +60,7 @@ final class ReminderScheduler {
             await requestPermissionIfNeeded()
         }
         await applyNotifications(plan, calendar: ledger.calendar)
+        await LiveActivities.apply(showNow: plan.showNow, starts: plan.activityStarts)
     }
 
     /// Asks once for permission to notify, only while the app is on screen and not running a
