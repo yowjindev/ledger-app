@@ -47,6 +47,7 @@ struct RootView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .postingDueInterest()
+        .refreshingReminders()
         .task {
             if let kind = AppLaunchConfiguration.current.initialEditorKind {
                 router.addTransaction(kind)

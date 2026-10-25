@@ -66,6 +66,9 @@ struct BillDetailView: View {
                 dueSection(bill, status: status, today: today)
             }
             detailsSection(bill)
+            if !bill.isArchived {
+                StrictReminderToggle(owner: .bill(bill.id), isOn: bill.strictReminder)
+            }
             paymentsSection(payments)
             actionsSection(bill, hasPayments: !payments.isEmpty)
         }
