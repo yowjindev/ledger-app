@@ -28,7 +28,8 @@ extension LedgerService {
     /// Creates a credit card or pay later account that owes `owedNow`.
     ///
     /// `stillDue` is the unpaid part of a statement that has already closed, for its upcoming
-    /// due date (`awaitingDue(for:)`); leave it `nil` when no statement is waiting for payment.
+    /// due date (`awaitingDue(for:)`). It's required while a statement is waiting for payment,
+    /// zero when it's paid, and must be `nil` otherwise.
     @discardableResult
     func createOwedAccount(
         name: String,
@@ -45,6 +46,9 @@ extension LedgerService {
         let owedMinor = try AmountRules.owedMinorUnits(owedNow, currency: currency)
 
         var waiting: (cycle: CalendarMonth, amountMinor: Int64)?
+        if stillDue == nil, awaitingDue(for: validated.schedule) != nil {
+            throw LedgerError.stillDueRequired
+        }
         if let stillDue {
             let stillDueMinor = try AmountRules.owedMinorUnits(stillDue, currency: currency)
             guard let due = awaitingDue(for: validated.schedule) else { throw LedgerError.stillDueNotApplicable }

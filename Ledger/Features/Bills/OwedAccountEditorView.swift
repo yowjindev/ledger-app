@@ -208,7 +208,9 @@ struct OwedAccountEditorView: View {
 
     private var canSave: Bool {
         guard !isSaving, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        return account != nil || owedNow != nil
+        guard account == nil else { return true }
+        let isStatementWaiting = ledger.awaitingDue(for: DueSchedule(statementDay: statementDay, dueDay: dueDay)) != nil
+        return owedNow != nil && (!isStatementWaiting || stillDue != nil)
     }
 
     private var terms: OwedTerms {

@@ -38,6 +38,7 @@ enum LedgerError: Error, Equatable, Sendable {
     case cashbackRateOutOfRange
     case stillDueNotApplicable
     case stillDueAboveOwed
+    case stillDueRequired
     case splitNotOffered
     case planMonthsOutOfRange(range: ClosedRange<Int>)
     case planTotalBelowPrice
@@ -125,6 +126,8 @@ extension LedgerError: LocalizedError {
             "No bill is waiting for payment right now. Leave this empty."
         case .stillDueAboveOwed:
             "What's still due can't be more than the total you owe."
+        case .stillDueRequired:
+            "Enter what's still due on your last statement, or 0 if it's paid."
         case .splitNotOffered:
             "Only pay later purchases can be split."
         case .planMonthsOutOfRange(let range):

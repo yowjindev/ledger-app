@@ -32,7 +32,7 @@ enum BillsCopy {
 
     static let totalOwedFooter = "What your credit cards, pay later accounts, and loans owe now. Regular bills aren't included until you pay them."
 
-    static let stillDueFooter = "The part of your last statement you haven't paid yet. Leave it empty if it's paid."
+    static let stillDueFooter = "Still due is the part of your last statement you haven't paid yet. Enter 0 if it's paid."
 
     static let owedFooter = "What the app or statement shows as your total balance, including purchases not billed yet."
 

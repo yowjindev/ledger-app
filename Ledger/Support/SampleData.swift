@@ -82,7 +82,7 @@ enum SampleData {
                 kind: .creditCard,
                 terms: OwedTerms(statementDay: 5, dueDay: 25, creditLimit: 20_000, cashbackPercent: 1),
                 owedNow: 1_500,
-                stillDue: nil
+                stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 5, dueDay: 25)).map { _ in 1_200 }
             )
             for (amount, category, age) in [(Decimal(650), "Food", 4.0), (Decimal(250), "Shopping", 30.0)] {
                 if let category = expenses[category] {
@@ -104,7 +104,7 @@ enum SampleData {
                 kind: .payLater,
                 terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000),
                 owedNow: 1_500,
-                stillDue: nil
+                stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 31, dueDay: 5)).map { _ in 1_500 }
             )
         }
     }

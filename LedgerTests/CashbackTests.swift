@@ -21,7 +21,7 @@ final class CashbackTests: XCTestCase {
             kind: .creditCard,
             terms: OwedTerms(statementDay: 5, dueDay: 25, cashbackPercent: cashback),
             owedNow: 0,
-            stillDue: nil
+            stillDue: 0
         )
         return Fixture(h: h, card: card, bank: try h.account("Bank", opening: 10_000), food: try h.expenseCategory("Food"))
     }

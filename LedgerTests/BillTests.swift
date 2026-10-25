@@ -215,7 +215,7 @@ final class BillTests: XCTestCase {
     func testMoveDueForAnOwedAccount() throws {
         let f = try fixture()
         let card = try f.h.ledger.createOwedAccount(
-            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 1_000, stillDue: nil
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 1_000, stillDue: 1_000
         )
 
         try f.h.ledger.moveDue(of: .account(card.id), cycle: march, to: day(2026, 3, 30))

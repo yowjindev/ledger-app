@@ -412,7 +412,7 @@ final class IntentFlowTests: XCTestCase {
     private func owedHarness() throws -> (LedgerHarness, Account) {
         let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
         let card = try h.ledger.createOwedAccount(
-            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_000, stillDue: nil
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_000, stillDue: 0
         )
         return (h, card)
     }
@@ -464,7 +464,7 @@ final class IntentFlowTests: XCTestCase {
         let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
         try h.account("Bank", opening: 10_000)
         try h.ledger.createOwedAccount(
-            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_500, stillDue: nil
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_500, stillDue: 2_500
         )
         let before = try h.transactionCount()
 

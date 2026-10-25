@@ -113,7 +113,7 @@ final class PaymentPlanTests: XCTestCase {
         let h = try harness()
         let account = try payLater(h)
         let card = try h.ledger.createOwedAccount(
-            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 0, stillDue: nil
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 0, stillDue: 0
         )
         let shopping = try h.expenseCategory("Shopping")
 

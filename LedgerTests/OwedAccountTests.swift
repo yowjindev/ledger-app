@@ -17,7 +17,7 @@ final class OwedAccountTests: XCTestCase {
         owed: Decimal,
         statementDay: Int = 5,
         dueDay: Int = 25,
-        stillDue: Decimal? = nil
+        stillDue: Decimal? = 0
     ) throws -> Account {
         try h.ledger.createOwedAccount(
             name: "Visa card",
@@ -88,6 +88,21 @@ final class OwedAccountTests: XCTestCase {
             try card(h, owed: 4_000, statementDay: 20, dueDay: 10, stillDue: 100)
         }
         XCTAssertTrue(try h.ledger.accounts().isEmpty)
+    }
+
+    func testStillDueIsRequiredWhileAStatementIsWaiting() throws {
+        let h = try harness()
+        assertThrowsLedgerError(.stillDueRequired) {
+            try h.ledger.createOwedAccount(
+                name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 3_000, stillDue: nil
+            )
+        }
+        XCTAssertTrue(try h.ledger.accounts().isEmpty)
+
+        let paid = try h.ledger.createOwedAccount(
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 3_000, stillDue: 0
+        )
+        XCTAssertEqual(try h.ledger.dueStatus(for: paid)?.isPaid, true)
     }
 
     func testStillDueCantExceedWhatIsOwed() throws {
@@ -197,7 +212,7 @@ final class OwedAccountTests: XCTestCase {
     func testTermsAreValidated() throws {
         let h = try harness()
         func make(_ terms: OwedTerms, kind: AccountKind = .creditCard) throws -> Account {
-            try h.ledger.createOwedAccount(name: "Card \(UUID().uuidString.prefix(6))", kind: kind, terms: terms, owedNow: 0, stillDue: nil)
+            try h.ledger.createOwedAccount(name: "Card \(UUID().uuidString.prefix(6))", kind: kind, terms: terms, owedNow: 0, stillDue: 0)
         }
 
         assertThrowsLedgerError(.dayOutOfRange) { try make(OwedTerms(statementDay: 5, dueDay: 0)) }

@@ -85,7 +85,7 @@ final class ComingUpTests: XCTestCase {
         let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
         let bank = try h.account("Bank", opening: 10_000)
         try h.ledger.createOwedAccount(
-            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_500, stillDue: nil
+            name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25), owedNow: 2_500, stillDue: 0
         )
         try h.ledger.createOwedAccount(
             name: "PayLater", kind: .payLater, terms: OwedTerms(statementDay: 31, dueDay: 5), owedNow: 640, stillDue: nil

@@ -9,7 +9,7 @@ final class CashbackHistoryTests: XCTestCase {
         let h = try LedgerHarness(calendar: try fixedCalendar("Asia/Manila"))
         let card = try h.ledger.createOwedAccount(
             name: "Visa card", kind: .creditCard, terms: OwedTerms(statementDay: 5, dueDay: 25, cashbackPercent: 1),
-            owedNow: 0, stillDue: nil
+            owedNow: 0, stillDue: 0
         )
         let food = try h.expenseCategory("Food")
         let purchase = try h.ledger.record(.expense(amount: 500, accountID: card.id, categoryID: food.id, occurredAt: h.clock.now))
