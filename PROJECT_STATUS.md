@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-10-13_
+_Last updated: 2026-10-20_
 
 ## Environment
 
@@ -23,10 +23,12 @@ _Last updated: 2026-10-13_
 
 ## Verification evidence
 
-- **Unit tests:** 181 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
+- **Unit tests:** 249 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
   are in `LedgerTests/LedgerServiceTests.swift`. Other suites cover rollback after a failed save
   for every kind of change, idempotency, time zones, parsing and formatting, onboarding setup,
-  Activity search and filters, the bank-email reader, the App Intent flows and the result list.
+  Activity search and filters, the bank-email reader, the App Intent flows and the result list,
+  plus balance adjustments, the daily interest formula and catch-up (including time-zone and
+  calendar changes), grouped interest rows, and the schema migration from version 1.
 - **Builds:** Debug and Release for the simulator and an arm64 iPhone build, all with zero
   warnings. App Intents metadata is extracted at build time.
 - **Screens:** every screen checked in light mode, dark mode and at accessibility text sizes.
@@ -45,6 +47,12 @@ _Last updated: 2026-10-13_
   signed without a team.
 - **iPhone 16 Pro:** Ledger Menu, Log Expense and Check Balances ran from the Home Screen, and
   the expense saved with the right new balance.
+- **Balance adjustments and daily interest (2026-10-20, simulator):** Update Balance, the interest
+  settings, interest rows in Overview, Activity and the account screen, and the interest detail
+  were checked in light and dark with sample data. The Ledger Menu lists Update Balance. Shortcuts
+  UI tests 01 and 03 pass; 04–08 failed at the amount keypad because the simulator's on-screen
+  keyboard was minimized (test08 failed the same way on the earlier commit). A multi-reviewer
+  review's three confirmed findings are fixed. Not yet tried on the iPhone.
 
 ## Decisions
 
