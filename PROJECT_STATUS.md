@@ -23,7 +23,7 @@ _Last updated: 2026-10-26_
 
 ## Verification evidence
 
-- **Unit tests:** 343 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
+- **Unit tests:** 351 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
   are in `LedgerTests/LedgerServiceTests.swift`. Other suites cover rollback after a failed save
   for every kind of change, idempotency, time zones, parsing and formatting, onboarding setup,
   Activity search and filters, the bank-email reader, the App Intent flows and the result list,
@@ -62,7 +62,11 @@ _Last updated: 2026-10-26_
   purchase in the expense editor, regular bills (paying, entering this month's amount, moving a
   due), Overview's Bills section, cashback in Activity and the transaction detail were checked in
   light and dark with sample data. Shortcuts UI test 03 (Check Balances) passes in light and dark.
-  A clean build and an arm64 device build have zero warnings. Not yet tried on the iPhone.
+  A clean build and an arm64 device build have zero warnings. A whole-branch review found no
+  critical issues; its six important findings (a cash advance after the statement, editing a
+  bill's amount, cashback after turning a rate off, a blank "still due", a bill already paid at
+  setup, owed balances in Shortcuts results) and stuck loan details are fixed, each with a test.
+  Not yet tried on the iPhone.
 
 ## Decisions
 
