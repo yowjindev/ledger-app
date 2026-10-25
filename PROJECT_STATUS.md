@@ -23,7 +23,7 @@ _Last updated: 2026-10-26_
 
 ## Verification evidence
 
-- **Unit tests:** 372 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
+- **Unit tests:** 379 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
   are in `LedgerTests/LedgerServiceTests.swift`. Other suites cover rollback after a failed save
   for every kind of change, idempotency, time zones, parsing and formatting, onboarding setup,
   Activity search and filters, the bank-email reader, the App Intent flows and the result list,
@@ -73,7 +73,10 @@ _Last updated: 2026-10-26_
   expanded) and on the Lock Screen, in light and dark, with no amounts; tapping **Paid** opened the
   prefilled payment. Shortcuts UI tests 01 and 03 pass with the logging intents adopting Live
   Activity intents. The widget extension builds for the simulator and an arm64 device with zero
-  warnings. Not yet tried on the iPhone.
+  warnings. A whole-branch review found one critical and three important issues (a background
+  refresh could drop scheduled starts, strict days past the start cap went silent, overlapping
+  refreshes, wording of a start after midnight) plus month-end arrival notices; all are fixed,
+  each with a test. Not yet tried on the iPhone.
 
 ## Decisions
 
