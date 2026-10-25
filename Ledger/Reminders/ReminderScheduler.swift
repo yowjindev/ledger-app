@@ -14,6 +14,7 @@ final class ReminderScheduler {
     private var container: ModelContainer?
     private var saveObserver: NSObjectProtocol?
     private var pendingRefresh: Task<Void, Never>?
+    private let runner = SerialRunner()
 
     /// Starts refreshing after every save to `container`.
     func start(container: ModelContainer) {
@@ -34,8 +35,16 @@ final class ReminderScheduler {
         }
     }
 
-    /// Plans every reminder again from the ledger and applies the plan.
-    func refresh() async {
+    /// Plans every reminder again from the ledger and applies the plan, one refresh at a time.
+    ///
+    /// - Parameter canStartActivities: Whether iOS will accept new Live Activities now: while the
+    ///   app is on screen, or inside a Live Activity intent. Defaults to whether the app is active.
+    func refresh(canStartActivities: Bool? = nil) async {
+        let canStart = canStartActivities ?? (UIApplication.shared.applicationState == .active)
+        await runner.run { await self.performRefresh(canStartActivities: canStart) }
+    }
+
+    private func performRefresh(canStartActivities: Bool) async {
         guard let container else { return }
         let ledger = LedgerService(context: container.mainContext)
         let items: [ReminderItem]
@@ -60,7 +69,12 @@ final class ReminderScheduler {
             await requestPermissionIfNeeded()
         }
         await applyNotifications(plan, calendar: ledger.calendar)
-        await LiveActivities.apply(showNow: plan.showNow, starts: plan.activityStarts)
+        await LiveActivities.apply(
+            showNow: plan.showNow,
+            starts: plan.activityStarts,
+            dueKeys: Set(items.map(\.status.owner.key)),
+            canStart: canStartActivities
+        )
     }
 
     /// Asks once for permission to notify, only while the app is on screen and not running a

@@ -7,7 +7,7 @@ enum ReminderActions {
     static func snooze(minutes: Int) async {
         snooze(lines: LiveActivities.shownLines(), minutes: minutes, now: .now, defaults: .standard)
         await LiveActivities.endShown()
-        await ReminderScheduler.shared.refresh()
+        await ReminderScheduler.shared.refresh(canStartActivities: true)
     }
 
     static func snooze(lines: [ReminderLine], minutes: Int, now: Date, defaults: UserDefaults) {

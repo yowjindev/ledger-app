@@ -19,5 +19,7 @@ struct DueActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable, Sendable {
         /// Overdue first, then by name.
         var lines: [ReminderLine]
+        /// When a scheduled start begins, so the app can tell its pending starts apart.
+        var startsAt: Date?
     }
 }

@@ -22,10 +22,11 @@ enum LiveActivities {
         }
     }
 
-    /// Shows `showNow` in one Live Activity, or closes it when nothing is due, and replaces the
-    /// scheduled starts with `starts`. Starting one is only possible while Ledger is on screen or
-    /// running a Live Activity intent; otherwise the start is skipped and tried next time.
-    static func apply(showNow: [ReminderLine], starts: [PlannedActivityStart]) async {
+    /// Shows `showNow` in one Live Activity, or closes it when nothing is due, and brings the
+    /// scheduled starts in line with `starts` (see `ActivityStartChanges`). New activities are
+    /// requested only when `canStart`: iOS accepts them only while Ledger is on screen or running
+    /// a Live Activity intent.
+    static func apply(showNow: [ReminderLine], starts: [PlannedActivityStart], dueKeys: Set<String>, canStart: Bool) async {
         let current = shown()
         if showNow.isEmpty {
             for activity in current {
@@ -36,7 +37,7 @@ enum LiveActivities {
             for extra in current.dropFirst() {
                 await extra.end(nil, dismissalPolicy: .immediate)
             }
-        } else {
+        } else if canStart {
             do {
                 _ = try Activity.request(
                     attributes: DueActivityAttributes(),
@@ -48,15 +49,22 @@ enum LiveActivities {
             }
         }
 
-        for activity in Activity<DueActivityAttributes>.activities where activity.activityState == .pending {
+        let pending = Activity<DueActivityAttributes>.activities.filter { $0.activityState == .pending }
+        let changes = ActivityStartChanges.changes(
+            pending: pending.map { PendingStart(id: $0.id, startsAt: $0.content.state.startsAt, lines: $0.content.state.lines) },
+            planned: starts,
+            dueKeys: dueKeys,
+            canStart: canStart
+        )
+        for activity in pending where changes.end.contains(activity.id) {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
-        for start in starts {
+        for start in changes.request {
             do {
                 _ = try Activity.request(
                     attributes: DueActivityAttributes(),
                     content: ActivityContent(
-                        state: .init(lines: start.lines),
+                        state: .init(lines: start.lines, startsAt: start.date),
                         staleDate: start.date.addingTimeInterval(ReminderPlanner.secondStartDelay)
                     ),
                     pushType: nil,
