@@ -117,6 +117,9 @@ extension LedgerService {
             requestID: requestID
         )
         context.insert(transaction)
+        if let rate = cashbackRate(for: transaction) {
+            insertCashback(for: transaction, rate: rate)
+        }
         try commit()
         Log.ledger.info("Recorded a \(resolved.kind.rawValue, privacy: .public) transaction")
         return transaction
@@ -184,6 +187,8 @@ extension LedgerService {
         }
         guard transaction.isEditable else { throw LedgerError.entryNotEditable }
         let resolved = try resolve(draft, editing: transaction)
+        let previousAccountID = transaction.account?.id
+        let cashback = try cashback(for: transaction)
         transaction.kindRaw = resolved.kind.rawValue
         transaction.amountMinor = resolved.amountMinor
         transaction.currencyCode = resolved.currency.rawValue
@@ -194,6 +199,7 @@ extension LedgerService {
         transaction.note = resolved.note
         transaction.reference = resolved.reference
         transaction.updatedAt = now
+        updateCashback(cashback, for: transaction, previousAccountID: previousAccountID)
         try commit()
         Log.ledger.info("Updated a transaction")
     }
@@ -218,9 +224,89 @@ extension LedgerService {
             Log.ledger.info("Deleted a transaction")
             return
         }
+        if let cashback = try cashback(for: transaction) {
+            context.delete(cashback)
+        }
         context.delete(transaction)
         try commit()
         Log.ledger.info("Deleted a transaction")
+    }
+
+    // MARK: Cashback
+
+    /// The cashback entry recorded with a credit card purchase, if any.
+    func cashback(for purchase: LedgerTransaction) throws -> LedgerTransaction? {
+        let key: UUID? = purchase.id
+        var descriptor = FetchDescriptor<LedgerTransaction>(predicate: #Predicate { $0.sourceTransactionID == key })
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    /// The rate a purchase earns cashback at now: an expense entered by the user, outside a
+    /// payment plan, on a credit card that has cashback. `nil` otherwise.
+    private func cashbackRate(for transaction: LedgerTransaction) -> Rate? {
+        guard
+            transaction.kind == .expense,
+            transaction.origin == .app || transaction.origin == .appIntent,
+            transaction.planID == nil,
+            let account = transaction.account,
+            account.kind == .creditCard
+        else { return nil }
+        return account.cashbackRate
+    }
+
+    /// Adds cashback for a purchase at `rate`; nothing when it rounds down to zero.
+    private func insertCashback(for purchase: LedgerTransaction, rate: Rate) {
+        guard let account = purchase.account else { return }
+        let amountMinor = CashbackCalculator.cashbackMinor(forPurchaseMinor: purchase.amountMinor, rate: rate)
+        guard amountMinor > 0 else { return }
+        let cashback = LedgerTransaction(
+            kind: .income,
+            amountMinor: amountMinor,
+            currency: purchase.currency,
+            occurredAt: purchase.occurredAt,
+            createdAt: now,
+            note: nil,
+            account: account,
+            destinationAccount: nil,
+            category: nil,
+            origin: .cashback,
+            reference: nil,
+            requestID: nil
+        )
+        cashback.basisMinor = purchase.amountMinor
+        cashback.basisRatePPM = rate.partsPerMillion
+        cashback.sourceTransactionID = purchase.id
+        context.insert(cashback)
+    }
+
+    /// Keeps a purchase's cashback in step after an edit. On the same card it's recalculated at
+    /// the rate it was earned at; moved off the card or no longer an expense, it's removed; moved
+    /// onto a card with cashback, it's added at that card's rate.
+    private func updateCashback(_ cashback: LedgerTransaction?, for purchase: LedgerTransaction, previousAccountID: UUID?) {
+        guard let currentRate = cashbackRate(for: purchase) else {
+            if let cashback { context.delete(cashback) }
+            return
+        }
+        let sameAccount = purchase.account?.id == previousAccountID
+        if let cashback {
+            guard sameAccount, let earnedPPM = cashback.basisRatePPM else {
+                context.delete(cashback)
+                insertCashback(for: purchase, rate: currentRate)
+                return
+            }
+            let amountMinor = CashbackCalculator.cashbackMinor(forPurchaseMinor: purchase.amountMinor, rate: Rate(partsPerMillion: earnedPPM))
+            guard amountMinor > 0 else {
+                context.delete(cashback)
+                return
+            }
+            cashback.amountMinor = amountMinor
+            cashback.basisMinor = purchase.amountMinor
+            cashback.occurredAt = purchase.occurredAt
+            cashback.updatedAt = now
+        } else if !sameAccount {
+            insertCashback(for: purchase, rate: currentRate)
+        }
     }
 
     // MARK: Duplicate detection
