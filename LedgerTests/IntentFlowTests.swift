@@ -417,6 +417,30 @@ final class IntentFlowTests: XCTestCase {
         return (h, card)
     }
 
+    func testExpenseOnACardShowsWhatYouOwe() async throws {
+        let (h, card) = try owedHarness()
+        let food = try h.expenseCategory("Food")
+
+        let outcome = try await IntentFlows.logExpense(
+            in: h.ledger,
+            amount: pesos("250"),
+            category: ExpenseCategoryEntity(food),
+            account: AccountEntity(card),
+            askAmount: { _ in throw UnexpectedPrompt() },
+            askCategory: { _ in throw UnexpectedPrompt() },
+            askAccount: { _ in throw UnexpectedPrompt() },
+            confirm: { _, _ in }
+        )
+
+        XCTAssertEqual(outcome.rows.map(\.title), ["Food", "Visa card"])
+        XCTAssertEqual(outcome.rows[1].subtitle, "You owe")
+        let owed = plainSpaces(outcome.rows[1].value ?? "")
+        XCTAssertTrue(owed.contains("2,250"), owed)
+        XCTAssertFalse(owed.contains("-"), "What's owed is shown as a positive amount: \(owed)")
+        let body = plainSpaces(try XCTUnwrap(outcome.body))
+        XCTAssertTrue(body.contains("You owe ₱2,250.00 on Visa card"), body)
+    }
+
     func testUpdateWhatYouOweAsksAndConfirms() async throws {
         let (h, card) = try owedHarness()
         var prompts: [String] = []

@@ -491,10 +491,21 @@ enum IntentFlows {
         )]
         var balanceLines: [String] = []
         for account in [transaction.account, transaction.destinationAccount].compactMap({ $0 }) {
-            guard let current = sheet?.balance(for: account.id)?.currentBalance else { continue }
-            let amount = formatter.string(current, alwaysShowCentavos: true)
-            balanceLines.append("\(account.name) balance: \(amount)")
-            rows.append(ResultRow(id: account.id, symbolName: account.kind.systemImage, title: account.name, subtitle: "New balance", value: amount))
+            guard let balance = sheet?.balance(for: account.id), let current = balance.currentBalance else { continue }
+            if account.kind.isOwed, let owed = balance.owed {
+                // Money owed reads as what's owed, or as a credit, never as a negative balance.
+                let amount = formatter.string(owed.magnitude, alwaysShowCentavos: true)
+                let isCredit = owed.isNegative
+                balanceLines.append(isCredit ? "\(account.name) has a \(amount) credit" : "You owe \(amount) on \(account.name)")
+                rows.append(ResultRow(
+                    id: account.id, symbolName: account.kind.systemImage, title: account.name,
+                    subtitle: isCredit ? "Credit" : "You owe", value: amount
+                ))
+            } else {
+                let amount = formatter.string(current, alwaysShowCentavos: true)
+                balanceLines.append("\(account.name) balance: \(amount)")
+                rows.append(ResultRow(id: account.id, symbolName: account.kind.systemImage, title: account.name, subtitle: "New balance", value: amount))
+            }
         }
         return IntentOutcome(
             headline: "\(kind.title) saved",
