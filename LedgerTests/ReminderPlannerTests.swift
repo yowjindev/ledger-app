@@ -78,7 +78,9 @@ final class ReminderPlannerTests: XCTestCase {
         XCTAssertEqual(result.activityStarts.map(\.date), [try at(3, 20), try at(3, 20, "17:00"), try at(3, 21)])
         XCTAssertEqual(result.activityStarts[0].lines.map(\.dateText), ["Due today"])
         XCTAssertEqual(result.activityStarts[2].lines.map(\.dateText), ["1 day overdue"])
-        XCTAssertFalse(result.notifications.contains { $0.id.contains(".due.") })
+        XCTAssertFalse(result.notifications.contains { $0.id.hasSuffix(".due.20260320") || $0.id.hasSuffix(".due.20260321") },
+                       "Days a kept start covers get no due notification")
+        XCTAssertTrue(result.notifications.contains { $0.id.hasSuffix(".due.20260322") }, "Days past the start cap still get one")
         XCTAssertTrue(result.notifications.contains { $0.id.hasSuffix(".headsup.20260319") })
     }
 
@@ -147,6 +149,28 @@ final class ReminderPlannerTests: XCTestCase {
         XCTAssertEqual(Array(result.activityStarts.map(\.date).prefix(2)), [try at(3, 20, "23:30"), try at(3, 21, "07:30")])
         let dates = result.activityStarts.map(\.date)
         XCTAssertEqual(dates.count, Set(dates).count, "Each start is planned once")
+    }
+
+    func testSecondStartPastMidnightUsesTheNewDaysWording() throws {
+        let result = plan([item("Rent", due: day(3, 20))], settings: ReminderSettings(minutesAfterMidnight: 1_410))
+
+        let nextMorning = try XCTUnwrap(result.activityStarts.first { $0.date == (try? at(3, 21, "07:30")) })
+        XCTAssertEqual(nextMorning.lines.map(\.dateText), ["1 day overdue"])
+        XCTAssertTrue(nextMorning.lines[0].isOverdue)
+    }
+
+    func testStrictDaysPastTheStartCapStillGetNotifications() throws {
+        let result = plan([item("PayLater", due: day(3, 16)), item("Rent", due: day(3, 20))])
+
+        XCTAssertEqual(result.activityStarts.map(\.date), [try at(3, 16), try at(3, 16, "17:00"), try at(3, 17)])
+        let rentKey = result.activityStarts.flatMap(\.lines).first { $0.name == "Rent" }?.ownerKey
+        XCTAssertNil(rentKey, "Rent's starts fall past the cap")
+        let rentDue = result.notifications.filter { $0.title == "Rent" && $0.id.contains(".due.") }
+        XCTAssertEqual(rentDue.first?.date, try at(3, 20))
+        XCTAssertEqual(rentDue.first?.body, "Due today")
+        let payLaterDue = result.notifications.filter { $0.title == "PayLater" && $0.id.contains(".due.") }
+        XCTAssertFalse(payLaterDue.contains { $0.id.hasSuffix(".due.20260316") }, "Days a kept start covers get no extra notification")
+        XCTAssertTrue(payLaterDue.contains { $0.id.hasSuffix(".due.20260318") })
     }
 
     // MARK: Varying bills

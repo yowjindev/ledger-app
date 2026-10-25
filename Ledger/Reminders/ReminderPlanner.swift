@@ -52,8 +52,9 @@ struct ReminderPlan: Hashable, Sendable {
 /// Pure reminder scheduling: which notifications and Live Activity starts each unpaid due gets.
 ///
 /// Every due gets a heads-up notification the day before. On the due day and each overdue day,
-/// a strict item joins the Live Activity started at the reminder time and again eight hours later;
-/// any other item gets one notification. A varying bill whose amount isn't entered also gets a
+/// a strict item joins the Live Activity started at the reminder time and again eight hours later,
+/// or gets a notification on days past the cap on scheduled starts; any other item gets one
+/// notification. A varying bill whose amount isn't entered also gets a
 /// notification each day from its arrival day. A snooze holds an item back until it ends.
 enum ReminderPlanner {
     static let idPrefix = "ledger.reminder."
@@ -80,7 +81,10 @@ enum ReminderPlanner {
         }
 
         var notifications: [PlannedNotification] = []
-        var slots: [Date: [ReminderLine]] = [:]
+        // Each slot's lines, with the due day each was planned for.
+        var slots: [Date: [(line: ReminderLine, day: CalendarDay)]] = [:]
+        // Strict items' due and overdue days, with the notification to send if no kept start covers one.
+        var strictDays: [(key: String, day: CalendarDay, notification: PlannedNotification)] = []
         var showNow: [ReminderLine] = []
 
         for item in items where !item.status.isPaid {
@@ -88,12 +92,15 @@ enum ReminderPlanner {
             let due = item.status.dueDate
             let isStrict = settings.isStrictEnabled && item.isStrict
             let snooze = snoozedUntil[key].flatMap { $0 > now ? $0 : nil }
-            func notify(_ kind: String, on day: CalendarDay, body: String) {
+            func notification(_ kind: String, on day: CalendarDay, body: String) -> PlannedNotification? {
                 let date = at(day)
-                guard date > now else { return }
-                notifications.append(PlannedNotification(
-                    id: "\(idPrefix)\(key).\(kind).\(day.storedValue)", date: date, title: item.name, body: body
-                ))
+                guard date > now else { return nil }
+                return PlannedNotification(id: "\(idPrefix)\(key).\(kind).\(day.storedValue)", date: date, title: item.name, body: body)
+            }
+            func notify(_ kind: String, on day: CalendarDay, body: String) {
+                if let planned = notification(kind, on: day, body: body) {
+                    notifications.append(planned)
+                }
             }
 
             notify("headsup", on: due.adding(days: -1, calendar: calendar), body: "Due tomorrow")
@@ -108,14 +115,17 @@ enum ReminderPlanner {
 
             var day = max(due, today)
             while day <= lastDay {
-                let line = line(for: item, on: day)
+                let dateText = line(for: item, on: day).dateText
                 if isStrict {
                     for date in [at(day), at(day).addingTimeInterval(secondStartDelay)] where date > now {
                         if let snooze, date < snooze { continue }
-                        slots[date, default: []].append(line)
+                        slots[date, default: []].append((line(for: item, on: CalendarDay(containing: date, calendar: calendar)), day))
+                    }
+                    if snooze.map({ $0 <= at(day) }) ?? true, let planned = notification("due", on: day, body: dateText) {
+                        strictDays.append((key, day, planned))
                     }
                 } else {
-                    notify("due", on: day, body: line.dateText)
+                    notify("due", on: day, body: dateText)
                 }
                 day = day.adding(days: 1, calendar: calendar)
             }
@@ -124,19 +134,22 @@ enum ReminderPlanner {
             if let snooze {
                 let snoozeDay = CalendarDay(containing: snooze, calendar: calendar)
                 if snoozeDay >= due {
-                    slots[snooze, default: []].append(line(for: item, on: snoozeDay))
+                    slots[snooze, default: []].append((line(for: item, on: snoozeDay), snoozeDay))
                 }
             } else if today >= due {
                 showNow.append(line(for: item, on: today))
             }
         }
 
-        let starts = slots
-            .map { PlannedActivityStart(date: $0.key, lines: sorted($0.value)) }
-            .sorted { $0.date < $1.date }
+        let kept = slots.sorted { $0.key < $1.key }.prefix(maxActivityStarts)
+        // A strict day no kept start covers, because of the cap, gets a notification instead.
+        let covered = Set(kept.flatMap { $0.value.map { "\($0.line.ownerKey)|\($0.day.storedValue)" } })
+        for strict in strictDays where !covered.contains("\(strict.key)|\(strict.day.storedValue)") {
+            notifications.append(strict.notification)
+        }
         return ReminderPlan(
             notifications: Array(notifications.sorted { ($0.date, $0.id) < ($1.date, $1.id) }.prefix(maxNotifications)),
-            activityStarts: Array(starts.prefix(maxActivityStarts)),
+            activityStarts: kept.map { PlannedActivityStart(date: $0.key, lines: sorted($0.value.map(\.line))) },
             showNow: sorted(showNow)
         )
     }
