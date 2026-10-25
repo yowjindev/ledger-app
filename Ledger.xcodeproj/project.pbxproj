@@ -11,13 +11,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		4C1E0000000000000000004B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 4C1E00000000000000000001 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 4C1E00000000000000000040;
-			remoteInfo = LedgerWidgets;
-		};
 		4C1E00000000000000000026 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4C1E00000000000000000001 /* Project object */;
@@ -31,6 +24,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 4C1E00000000000000000010;
 			remoteInfo = Ledger;
+		};
+		4C1E0000000000000000004B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4C1E00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4C1E00000000000000000040;
+			remoteInfo = LedgerWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
