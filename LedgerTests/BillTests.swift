@@ -95,6 +95,39 @@ final class BillTests: XCTestCase {
         XCTAssertEqual(try f.h.ledger.dueStatus(for: bill).left?.amount, 150, "An amount already set is kept by later payments")
     }
 
+    func testRaisingABillsAmountKeepsPastMonths() throws {
+        let f = try fixture()
+        let bill = try rentBill(f)
+        try pay(8_000, bill, cycle: march, f)
+        f.h.clock.now = try instant("2026-04-01T10:00:00+08:00")
+
+        try f.h.ledger.updateBill(bill, with: BillTerms(
+            name: "Rent", categoryID: f.rent.id, dueDay: 25, amount: 9_000, arrivesDay: nil, payFromAccountID: f.bank.id
+        ))
+
+        let due = try f.h.ledger.dueStatus(for: bill)
+        XCTAssertEqual(due.cycle, april)
+        XCTAssertFalse(due.isOverdue)
+        XCTAssertEqual(due.left?.amount, 9_000)
+        XCTAssertEqual(try f.h.ledger.dueOverrides(for: bill.id).first { $0.cycle == 202603 }?.amountMinor, 800_000)
+    }
+
+    func testSwitchingToVaryingKeepsPastMonths() throws {
+        let f = try fixture()
+        let bill = try rentBill(f)
+        try pay(8_000, bill, cycle: march, f)
+        f.h.clock.now = try instant("2026-04-01T10:00:00+08:00")
+
+        try f.h.ledger.updateBill(bill, with: BillTerms(
+            name: "Rent", categoryID: f.rent.id, dueDay: 25, amount: nil, arrivesDay: 20, payFromAccountID: nil
+        ))
+
+        let due = try f.h.ledger.dueStatus(for: bill)
+        XCTAssertEqual(due.cycle, april)
+        XCTAssertFalse(due.isOverdue)
+        XCTAssertNil(due.left)
+    }
+
     func testPartialPaymentLeavesTheRest() throws {
         let f = try fixture()
         let bill = try rentBill(f)

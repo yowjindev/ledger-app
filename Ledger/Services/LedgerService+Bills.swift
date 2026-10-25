@@ -97,6 +97,9 @@ extension LedgerService {
         guard bill.modelContext != nil, !bill.isDeleted else { throw LedgerError.billNotFound }
         let others = try bills(includeArchived: true).filter { $0.id != bill.id }
         let validated = try validatedBill(terms, existingNames: others.map(\.name), currentCategoryID: bill.category?.id)
+        if let oldAmountMinor = bill.amountMinor, validated.amountMinor != oldAmountMinor {
+            try keepAmount(oldAmountMinor, forPastCyclesOf: bill)
+        }
         bill.name = validated.name
         bill.category = validated.category
         bill.dueDay = terms.dueDay
@@ -172,6 +175,21 @@ extension LedgerService {
         try commit()
         Log.ledger.info("Recorded a bill payment")
         return payment
+    }
+
+    /// Records `amountMinor` on last month's cycle and every earlier cycle with payments, where no
+    /// amount is set yet, so a new amount applies from the current due on and never rewrites the past.
+    private func keepAmount(_ amountMinor: Int64, forPastCyclesOf bill: Bill) throws {
+        let current = bill.schedule.cycle(dueOnOrAfter: today)
+        let start = CalendarMonth(storedValue: bill.startCycle) ?? current
+        var cycles = Set(try payments(for: bill).compactMap { $0.billCycle.flatMap(CalendarMonth.init(storedValue:)) })
+        cycles.insert(current.adding(months: -1))
+        for cycle in cycles where cycle >= start && cycle < current {
+            let override = try dueOverride(for: bill.id, cycle: cycle)
+            if override.amountMinor == nil {
+                override.amountMinor = amountMinor
+            }
+        }
     }
 
     // MARK: Validation
