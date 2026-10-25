@@ -48,6 +48,11 @@ iPhone.
 - **Cashback, splits and loans.** Cashback is added to every purchase on a card that earns it.
   Split a pay later purchase into monthly payments, add a loan you're partway through, and see
   "6 of 12 paid" and what's left on each due.
+- **Due reminders you can't miss.** On a due day, a Live Activity shows what's due in the
+  Dynamic Island and on the Lock Screen, and keeps coming back until it's paid. Snooze it for an
+  hour or three, move this month's due date, or tap **Paid** to open the payment. Prefer plain
+  notifications? Turn strict reminders off in Settings or for any single bill. Reminders never
+  show amounts.
 - **Duplicate protection.** A double tap saves once, and an entry identical to one from the last
   two minutes asks before saving again.
 - **Log from bank emails.** A Shortcuts automation can pass a bank's email to Ledger, which reads
@@ -236,6 +241,21 @@ left on a due = what's owed now − charges billed after its statement − plan 
   **Paid** records the payment as an expense in the bill's category. One month's due can be moved
   without changing the others.
 
+### Reminders
+
+- Every unpaid due gets a notification the day before, at the reminder time (9:00 AM unless you
+  change it in Settings). A bill whose amount varies also gets "Check if your bill came in" each
+  day from its usual arrival day until you enter the amount.
+- **Strict reminders** (on by default, in Settings and on each bill or debt): from the due day,
+  a Live Activity lists everything due or overdue. It starts at the reminder time and again eight
+  hours later, because iOS ends Live Activities after about eight hours, and it shows as soon as
+  you open Ledger. **Snooze** hides it for 1 or 3 hours; **Move** changes this month's due date;
+  **Paid** opens the prefilled payment, and nothing is paid until you save it.
+- With strict reminders off, or Live Activities turned off for Ledger, you get one notification on
+  the due day and each overdue day instead.
+- Everything is scheduled on the iPhone; there's no server. iOS lets an app line up a Live Activity
+  only while it runs, so Ledger reschedules every time it opens or a shortcut runs.
+
 ### Accounts and categories
 
 First launch creates the accounts GCash, GoTyme, Maya, PNB and Wallet; the expense categories
@@ -263,12 +283,12 @@ xcodebuild -project Ledger.xcodeproj -scheme Ledger \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-351 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
+372 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
 real data. They cover balances after every kind of change, transfers, edits and deletes, failed
 saves, exact arithmetic, archiving, duplicate protection, unset opening balances, balance
 adjustments, daily interest and its catch-up, billing cycles and dues, cashback, payment plans,
-regular bills, the schema migrations, amount parsing and formatting, the bank-email reader, and
-the App Intent flows.
+regular bills, reminder planning (strict and plain, snoozes, moved and overdue dues), the schema
+migrations, amount parsing and formatting, the bank-email reader, and the App Intent flows.
 
 The optional **LedgerShortcutsUITests** scheme drives Apple's Shortcuts app in the simulator. It
 checks that the App Shortcuts are registered, runs Check Balances, walks the prompts, cancels
@@ -289,8 +309,11 @@ Ledger/
   Components/     Shared SwiftUI views and navigation
   Features/       Screens: Overview, Activity, Accounts, Bills, Onboarding, Settings
   Intents/        App Intents, entities, App Shortcuts, intent flows, result list
+  Reminders/      Reminder planning, notifications, Live Activity scheduling
   Support/        Logging; Debug-only sample data for previews and screenshots
   Resources/      Asset catalog
+LedgerShared/     Live Activity attributes, reminder wording and button intents (app and widget)
+LedgerWidgets/    Widget extension that draws the due reminder Live Activity
 LedgerTests/      Unit tests
 LedgerUITests/    Optional UI tests that drive the Shortcuts app (separate scheme)
 scripts/          App icon generator, SF Symbol checker, simulator screenshot helper
@@ -326,10 +349,11 @@ what has been verified where.
 | Result list | Checked in the simulator in light and dark |
 | Balance adjustments and daily interest | Unit-tested; screens checked in the simulator in light and dark; not yet run on an iPhone |
 | Bills and debts | Unit-tested; screens checked in the simulator in light and dark; not yet run on an iPhone |
+| Due reminders | Unit-tested; notifications, the Dynamic Island, the Lock Screen Live Activity and its Paid button checked in the simulator in light and dark; not yet run on an iPhone |
 | Log Income, Transfer Money, Log From Message on a device | Not tried yet; covered by unit tests that drive the same flow code |
 
-**Limitations:** one currency (PHP); no export, import or sync; no widgets or Apple Watch app;
-iPhone only, portrait.
+**Limitations:** one currency (PHP); no export, import or sync; no Home Screen widgets or Apple
+Watch app, though the due reminder Live Activity shows in the Smart Stack; iPhone only, portrait.
 
 **Not built yet, with room left in the data model:** budgets, pay-period tracking and
 projections, recurring obligations, reserved funds and emergency-fund tracking, advanced
