@@ -42,6 +42,12 @@ iPhone.
 - **Daily interest.** Give a savings account its annual rate and withholding tax, and Ledger adds
   each day's interest and tax at 1:00 AM the next day, as one row per day. If Ledger hasn't run
   for a while, it catches up on the missed days the next time it does.
+- **Bills and debts.** A Bills tab keeps credit cards, pay later accounts, loans and regular
+  bills apart from the money you have, with what's due next at the top. Log a card purchase like
+  any expense; pay it with a transfer, which is never counted as spending.
+- **Cashback, splits and loans.** Cashback is added to every purchase on a card that earns it.
+  Split a pay later purchase into monthly payments, add a loan you're partway through, and see
+  "6 of 12 paid" and what's left on each due.
 - **Duplicate protection.** A double tap saves once, and an entry identical to one from the last
   two minutes asks before saving again.
 - **Log from bank emails.** A Shortcuts automation can pass a bank's email to Ledger, which reads
@@ -208,6 +214,28 @@ tax      = interest × withholding tax rate (20% by default), rounded to the nea
 - The formula was inferred from one bank's statements. If yours rounds differently, Update Balance
   brings the account back in line.
 
+### Bills and debts
+
+```
+left on a due = what's owed now − charges billed after its statement − plan payments due later
+```
+
+- Credit cards, pay later accounts and loans are accounts whose balance is what you owe. They're
+  left out of the total liquid balance and shown in the Bills tab, which adds them up as
+  **Total You Owe**. Setting one up asks for the total you owe now and, when a statement has
+  already closed, what's still due on it.
+- Nothing about a payment is stored separately: any transfer into the account counts toward its
+  due as soon as it's logged, including from the Action Button. A due that passes unpaid is
+  marked overdue, and what's left carries into the next one.
+- Cashback is a percentage of each purchase, rounded down to the centavo, recorded with the
+  purchase and kept in step when it's edited or deleted. It counts as income.
+- A split or loan is a plan of monthly payments on the account's due dates. A new one records the
+  price as spending in its category and any extra as fees and interest; one already under way
+  records nothing new. Months paid follow the dues, so one payment never counts for two plans.
+- Regular bills (rent, internet, electricity) have a due day and a fixed or varying amount.
+  **Paid** records the payment as an expense in the bill's category. One month's due can be moved
+  without changing the others.
+
 ### Accounts and categories
 
 First launch creates the accounts GCash, GoTyme, Maya, PNB and Wallet; the expense categories
@@ -235,11 +263,12 @@ xcodebuild -project Ledger.xcodeproj -scheme Ledger \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-249 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
+343 unit tests run against isolated in-memory stores with fixed clocks and synthetic data, never
 real data. They cover balances after every kind of change, transfers, edits and deletes, failed
 saves, exact arithmetic, archiving, duplicate protection, unset opening balances, balance
-adjustments, daily interest and its catch-up, the schema migration, amount parsing and formatting,
-the bank-email reader, and the App Intent flows.
+adjustments, daily interest and its catch-up, billing cycles and dues, cashback, payment plans,
+regular bills, the schema migrations, amount parsing and formatting, the bank-email reader, and
+the App Intent flows.
 
 The optional **LedgerShortcutsUITests** scheme drives Apple's Shortcuts app in the simulator. It
 checks that the App Shortcuts are registered, runs Check Balances, walks the prompts, cancels
@@ -258,7 +287,7 @@ Ledger/
   Services/       LedgerService, BalanceCalculator, reporting periods, bank-email reader
   Formatting/     Money formatting, amount parsing, display and app preferences
   Components/     Shared SwiftUI views and navigation
-  Features/       Screens: Overview, Activity, Accounts, Onboarding, Settings
+  Features/       Screens: Overview, Activity, Accounts, Bills, Onboarding, Settings
   Intents/        App Intents, entities, App Shortcuts, intent flows, result list
   Support/        Logging; Debug-only sample data for previews and screenshots
   Resources/      Asset catalog
@@ -278,7 +307,7 @@ builds ignore them.
 | `-LedgerInMemoryStore YES` | Use a throwaway in-memory store; the real store is untouched |
 | `-LedgerSampleData YES` | With the in-memory store, add sample records |
 | `-LedgerSkipOnboarding YES` | Start on the tabs |
-| `-LedgerInitialTab dashboard\|transactions\|accounts\|settings` | Open a specific tab |
+| `-LedgerInitialTab dashboard\|transactions\|accounts\|bills\|settings` | Open a specific tab |
 | `-LedgerOpenEditor expense\|income\|transfer` | Open the transaction editor on launch |
 
 `scripts/screenshot.sh` installs a build on a simulator, launches it with such arguments, and saves
@@ -296,6 +325,7 @@ what has been verified where.
 | Ledger Menu, Log Expense and Check Balances on an iPhone | Run on an iPhone 16 Pro |
 | Result list | Checked in the simulator in light and dark |
 | Balance adjustments and daily interest | Unit-tested; screens checked in the simulator in light and dark; not yet run on an iPhone |
+| Bills and debts | Unit-tested; screens checked in the simulator in light and dark; not yet run on an iPhone |
 | Log Income, Transfer Money, Log From Message on a device | Not tried yet; covered by unit tests that drive the same flow code |
 
 **Limitations:** one currency (PHP); no export, import or sync; no widgets or Apple Watch app;

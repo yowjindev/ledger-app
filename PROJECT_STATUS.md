@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-10-20_
+_Last updated: 2026-10-26_
 
 ## Environment
 
@@ -23,12 +23,16 @@ _Last updated: 2026-10-20_
 
 ## Verification evidence
 
-- **Unit tests:** 249 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
+- **Unit tests:** 343 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
   are in `LedgerTests/LedgerServiceTests.swift`. Other suites cover rollback after a failed save
   for every kind of change, idempotency, time zones, parsing and formatting, onboarding setup,
   Activity search and filters, the bank-email reader, the App Intent flows and the result list,
   plus balance adjustments, the daily interest formula and catch-up (including time-zone and
-  calendar changes), grouped interest rows, and the schema migration from version 1.
+  calendar changes), grouped interest rows, and the schema migrations from versions 1 and 2. Bills
+  and debts add billing cycles and month-end due days, what's left on each due (early, partial,
+  over and overdue payments, a statement still due at setup, local-time cut-offs), cashback kept
+  in step with its purchase, split purchases and loans, regular bills, moving one due, and the
+  Ledger Menu for money owed.
 - **Builds:** Debug and Release for the simulator and an arm64 iPhone build, all with zero
   warnings. App Intents metadata is extracted at build time.
 - **Screens:** every screen checked in light mode, dark mode and at accessibility text sizes.
@@ -53,6 +57,12 @@ _Last updated: 2026-10-20_
   UI tests 01 and 03 pass; 04–08 failed at the amount keypad because the simulator's on-screen
   keyboard was minimized (test08 failed the same way on the earlier commit). A multi-reviewer
   review's three confirmed findings are fixed. Not yet tried on the iPhone.
+- **Bills and debts (2026-10-26, simulator):** the Bills tab, credit card, pay later and loan
+  screens, Pay, Update What You Owe, adding a split already under way, the loan editor, a split
+  purchase in the expense editor, regular bills (paying, entering this month's amount, moving a
+  due), Overview's Bills section, cashback in Activity and the transaction detail were checked in
+  light and dark with sample data. Shortcuts UI test 03 (Check Balances) passes in light and dark.
+  A clean build and an arm64 device build have zero warnings. Not yet tried on the iPhone.
 
 ## Decisions
 
@@ -76,6 +86,18 @@ _Last updated: 2026-10-20_
   default) rounded to the nearest centavo; both dated 1:00 AM the next day. The formula matched an
   observed bank credit; ÷ 365 did not. Rates are stored exactly in parts per million. Posted days
   are tracked as calendar dates, so a time zone change never posts a day twice.
+- **Money owed:** credit cards, pay later accounts and loans are account kinds whose balance is
+  negative while money is owed, so the balance math is unchanged. They stay out of the total liquid
+  balance. A purchase is an expense; a payment is a transfer. What's left on a due is worked out
+  from the balance each time, so any transfer counts toward it and nothing about a payment is
+  stored separately.
+- **Cashback:** a percentage of each card purchase, rounded down, recorded in the same save as the
+  purchase and counted as income. Editing keeps the rate it was earned at.
+- **Splits and loans:** monthly plans on the account's due dates. A new one records the price as
+  spending and the extra as fees and interest; one already under way records nothing, because what
+  the account owes already includes it.
+- **Regular bills:** monthly, with a fixed or varying amount. A payment is an expense tagged with
+  its bill and month. One month's due can be moved without changing the others.
 - **Intents require an unlocked iPhone** (`.requiresAuthentication`), because they read or
   change financial data. To allow logging from a locked phone, change the `authenticationPolicy`
   lines in `Ledger/Intents/LedgerIntents.swift` to `.alwaysAllowed`. That lets anyone holding the
@@ -101,6 +123,11 @@ _Last updated: 2026-10-20_
 6. Turn on daily interest for a savings account and compare Ledger's daily interest and tax with
    the bank's for a few days. If they differ, note the balance, interest and tax the bank showed,
    so the rounding rule can be adjusted.
+7. On the iPhone, add a credit card, a pay later account and a loan as they stand today, then
+   compare each due and amount left with the bank's app through one billing cycle. Check that
+   cashback matches what the bank credits.
+8. Due-date reminders (notifications and a Live Activity) are designed but not built yet; see
+   `docs/superpowers/specs/2026-10-26-bills-debts-and-reminders-design.md`, Part B.
 
 If a step fails on the device, look in Console.app for the app's messages in the `intents`
 category.
@@ -113,6 +140,11 @@ category.
   just ended.
 - Update Balance from the Ledger Menu can't set a balance of exactly ₱0, because Shortcuts sends 0
   for an empty amount. The app can.
+- An expense logged from the Action Button isn't matched to a regular bill; mark it paid from the
+  bill instead. Bills repeat monthly only.
+- Credit card purchases can't be split into installments; only pay later purchases and loans can.
+- Purchases logged with dates before an owed account was added change what it owes, the same way
+  backdated entries change any balance; Update What You Owe brings it back in line.
 - Single currency (PHP); no export, import, sync, widgets or Apple Watch app; iPhone only.
 - Search and filtering run in memory, which is fine at personal scale. Tens of thousands of
   records would call for predicate-based queries.
