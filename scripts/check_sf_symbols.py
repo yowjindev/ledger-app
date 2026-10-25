@@ -21,7 +21,7 @@ LATEST_ALLOWED_RELEASE = 2025
 
 
 def main() -> int:
-    roots = [Path(p) for p in sys.argv[1:]] or [Path("Ledger")]
+    roots = [Path(p) for p in sys.argv[1:]] or [Path("Ledger"), Path("LedgerShared"), Path("LedgerWidgets")]
     symbols = plistlib.load(CATALOG.open("rb")).get("symbols", {})
     problems = []
     checked = 0

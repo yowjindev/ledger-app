@@ -178,16 +178,6 @@ enum ReminderPlanner {
     }
 }
 
-/// One due as a reminder shows it: name, symbol, and when it's due. Never an amount.
-struct ReminderLine: Hashable, Sendable, Codable {
-    let ownerKey: String
-    let name: String
-    let symbolName: String
-    /// "Due today", "1 day overdue", "3 days overdue".
-    let dateText: String
-    let isOverdue: Bool
-}
-
 extension DueOwner {
     /// A stable text form, used in notification identifiers and Live Activity buttons.
     var key: String {
