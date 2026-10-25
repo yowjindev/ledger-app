@@ -74,10 +74,8 @@ struct OwedAccountDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(account.name)
         .toolbar {
-            if account.kind != .loan {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { isEditing = true }
-                }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") { isEditing = true }
             }
         }
         .refreshingCurrentDate($now)
@@ -193,6 +191,10 @@ struct OwedAccountDetailView: View {
             }
             if account.kind == .payLater && !account.isArchived {
                 Button("Add a Split You're Already Paying", systemImage: "plus.circle") {
+                    isAddingPlan = true
+                }
+            } else if account.kind == .loan && accountPlans.isEmpty && !account.isArchived {
+                Button("Add Payments", systemImage: "plus.circle") {
                     isAddingPlan = true
                 }
             }

@@ -93,14 +93,18 @@ extension LedgerService {
         return plan
     }
 
-    /// Adds a split that's already under way to a pay later account. Its purchase happened
-    /// before Ledger, and what the account owes already includes it, so no entries are recorded.
+    /// Adds payments that are already under way: a split on a pay later account, or a loan's
+    /// payments in place of a plan that was deleted. The purchase happened before Ledger, and what
+    /// the account owes already includes it, so no entries are recorded.
     @discardableResult
     func addExistingPlan(_ terms: PlanTerms, to account: Account) throws -> PaymentPlan {
         guard account.modelContext != nil, !account.isDeleted else { throw LedgerError.accountNotFound }
-        guard account.kind == .payLater, let schedule = account.dueSchedule else { throw LedgerError.splitNotOffered }
+        guard account.kind == .payLater || account.kind == .loan, let schedule = account.dueSchedule else {
+            throw LedgerError.splitNotOffered
+        }
         guard !account.isArchived else { throw LedgerError.accountArchived(name: account.name) }
-        let validated = try validatedPlan(terms, months: Self.splitMonths, currency: account.currency)
+        let months = account.kind == .loan ? Self.loanMonths : Self.splitMonths
+        let validated = try validatedPlan(terms, months: months, currency: account.currency)
         guard schedule.dueDate(in: CalendarMonth(containing: terms.nextDue)) == terms.nextDue else {
             throw LedgerError.dueDateNotOnSchedule
         }

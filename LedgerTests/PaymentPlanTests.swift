@@ -176,6 +176,33 @@ final class PaymentPlanTests: XCTestCase {
         XCTAssertEqual(try h.ledger.monthsPaid(plan), 6)
     }
 
+    func testALoansPlanCanBeReplacedAndItsTermsEdited() throws {
+        let h = try harness()
+        let loan = try partwayLoan(h)
+        try h.ledger.deletePlan(try XCTUnwrap(try h.ledger.plans(for: loan).first))
+
+        let plan = try h.ledger.addExistingPlan(
+            PlanTerms(title: "Phone", monthly: 2_500, last: nil, months: 12, paidAtStart: 6, nextDue: day(2026, 4, 10)),
+            to: try {
+                try h.ledger.updateOwedAccount(loan, name: "Phone", terms: OwedTerms(statementDay: nil, dueDay: 10))
+                return loan
+            }()
+        )
+
+        XCTAssertEqual(loan.name, "Phone")
+        XCTAssertEqual(loan.dueDay, 10)
+        XCTAssertNil(loan.statementDay)
+        XCTAssertEqual(plan.monthlyMinor, 250_000)
+        XCTAssertEqual(try h.ledger.monthsPaid(plan), 6)
+        XCTAssertEqual(try h.ledger.dueStatus(for: loan)?.dueDate, day(2026, 4, 10))
+        assertThrowsLedgerError(.planMonthsOutOfRange(range: 1...60)) {
+            try h.ledger.addExistingPlan(
+                PlanTerms(title: "Phone", monthly: 2_500, last: nil, months: 61, paidAtStart: 0, nextDue: day(2026, 4, 10)),
+                to: loan
+            )
+        }
+    }
+
     func testNewLoanRecordsItemAndFees() throws {
         let h = try harness()
         let gadgets = try h.expenseCategory("Gadgets")

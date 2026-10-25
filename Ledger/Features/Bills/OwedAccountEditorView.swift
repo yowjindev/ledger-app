@@ -46,7 +46,8 @@ struct OwedAccountEditorView: View {
     }
 
     /// - Parameters:
-    ///   - kind: `.creditCard` or `.payLater`; ignored when editing.
+    ///   - kind: `.creditCard` or `.payLater` when adding; when editing, the account's own kind,
+    ///     including `.loan`, whose editor shows only its name and due day.
     ///   - account: The account to edit, or `nil` to add one.
     init(kind: AccountKind, account: Account? = nil) {
         self.kind = account?.kind ?? kind
@@ -78,22 +79,28 @@ struct OwedAccountEditorView: View {
                         .focused($focusedField, equals: .name)
                 }
                 Section {
-                    dayPicker("Statement Closes", selection: $statementDay)
+                    if kind != .loan {
+                        dayPicker("Statement Closes", selection: $statementDay)
+                    }
                     dayPicker("Payment Due", selection: $dueDay)
                 } header: {
                     Text("Billing")
                 } footer: {
-                    Text("Purchases up to the statement day are due on the next due day.")
+                    Text(kind == .loan
+                        ? "Payments are due on this day every month."
+                        : "Purchases up to the statement day are due on the next due day.")
                 }
-                Section {
-                    AmountField(BillsCopy.limitTitle(for: kind), amount: $limit)
-                        .focused($focusedField, equals: .limit)
-                    if kind == .creditCard {
-                        cashbackField
-                    }
-                } footer: {
-                    if kind == .creditCard {
-                        Text("Cashback is added automatically to every purchase you log on this card, rounded down to the centavo.")
+                if kind != .loan {
+                    Section {
+                        AmountField(BillsCopy.limitTitle(for: kind), amount: $limit)
+                            .focused($focusedField, equals: .limit)
+                        if kind == .creditCard {
+                            cashbackField
+                        }
+                    } footer: {
+                        if kind == .creditCard {
+                            Text("Cashback is added automatically to every purchase you log on this card, rounded down to the centavo.")
+                        }
                     }
                 }
                 if account == nil {
@@ -215,7 +222,7 @@ struct OwedAccountEditorView: View {
 
     private var terms: OwedTerms {
         let cashback = cashbackText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Rate.parse(cashbackText, locale: locale)
-        return OwedTerms(statementDay: statementDay, dueDay: dueDay, creditLimit: limit, cashbackPercent: cashback)
+        return OwedTerms(statementDay: kind == .loan ? nil : statementDay, dueDay: dueDay, creditLimit: limit, cashbackPercent: cashback)
     }
 
     /// Saves through the ledger and closes the sheet only after the save succeeded.

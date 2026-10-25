@@ -1,8 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Sheet for adding a split that's already under way to a pay later account, such as 3 of 6
-/// payments made. Records no entries: what the account owes already includes it.
+/// Sheet for adding payments that are already under way: a split on a pay later account, such as
+/// 3 of 6 payments made, or a loan's payments. Records no entries: what the account owes already
+/// includes them.
 struct ExistingPlanView: View {
     let account: Account
 
@@ -23,17 +24,17 @@ struct ExistingPlanView: View {
                         .textInputAutocapitalization(.sentences)
                 }
                 Section {
-                    PlanPaymentRows(input: $input, months: LedgerService.splitMonths)
+                    PlanPaymentRows(input: $input, months: account.kind == .loan ? LedgerService.loanMonths : LedgerService.splitMonths)
                     Picker("Next Payment", selection: $nextDue) {
                         ForEach(dueDates, id: \.self) { day in
                             Text(DueStatusCopy.shortDate(day, calendar: calendar)).tag(CalendarDay?.some(day))
                         }
                     }
                 } footer: {
-                    Text("What \(account.name) owes already includes this split, so nothing is added to it. Ledger uses the plan to work out each due.")
+                    Text("What \(account.name) owes already includes these payments, so nothing is added to it. Ledger uses them to work out each due.")
                 }
             }
-            .navigationTitle("Add a Split")
+            .navigationTitle(account.kind == .loan ? "Add Payments" : "Add a Split")
             .navigationSubtitle(account.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
