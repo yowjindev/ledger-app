@@ -17,7 +17,7 @@ struct OnboardingBalancesStep: View {
         filter: #Predicate<Account> { !$0.isArchived },
         sort: [SortDescriptor(\Account.sortOrder), SortDescriptor(\Account.createdAt)]
     )
-    private var accounts: [Account]
+    private var activeAccounts: [Account]
     @Query private var transactions: [LedgerTransaction]
     @State private var unusedIDs: Set<UUID> = []
     /// Amounts edited on this screen. An entry holding `nil` means the field was cleared;
@@ -146,6 +146,11 @@ struct OnboardingBalancesStep: View {
             .disabled(isSaving)
         }
         .padding(.horizontal, 24)
+    }
+
+    /// Accounts holding money the user has; money owed is set up in the Bills tab.
+    private var accounts: [Account] {
+        activeAccounts.filter { !$0.kind.isOwed }
     }
 
     private var hasUsedAccount: Bool {

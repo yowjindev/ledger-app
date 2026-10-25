@@ -5,6 +5,7 @@ enum AppTab: String, CaseIterable, Hashable, Sendable {
     case dashboard
     case transactions
     case accounts
+    case bills
     case settings
 }
 

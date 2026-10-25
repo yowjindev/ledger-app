@@ -32,6 +32,12 @@ struct RootView: View {
                         .ledgerRouteDestinations()
                 }
             }
+            Tab("Bills", systemImage: "calendar", value: AppTab.bills) {
+                NavigationStack {
+                    BillsView()
+                        .ledgerRouteDestinations()
+                }
+            }
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
                 NavigationStack {
                     SettingsView()

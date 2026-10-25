@@ -7,6 +7,10 @@ struct TransactionSummary: Identifiable, Hashable, Sendable {
     static let interestTitle = "Interest"
     static let withholdingTaxTitle = "Withholding tax"
     static let interestSymbolName = "percent"
+    static let cashbackTitle = "Cashback"
+    static let cashbackSymbolName = "arrow.uturn.backward.circle"
+    static let planFeesTitle = "Fees and interest"
+    static let planFeesSymbolName = "receipt"
 
     let id: UUID
     /// `nil` for records whose kind this app version doesn't know.
@@ -43,6 +47,14 @@ struct TransactionSummary: Identifiable, Hashable, Sendable {
         case .expense where transaction.origin == .interest, .income where transaction.origin == .interest:
             title = transaction.kind == .income ? Self.interestTitle : Self.withholdingTaxTitle
             symbolName = Self.interestSymbolName
+            accountLine = sourceName
+        case .income where transaction.origin == .cashback:
+            title = Self.cashbackTitle
+            symbolName = Self.cashbackSymbolName
+            accountLine = sourceName
+        case .expense where transaction.origin == .planFees:
+            title = Self.planFeesTitle
+            symbolName = Self.planFeesSymbolName
             accountLine = sourceName
         case .expense, .income:
             let categoryKind = transaction.category?.kind ?? (transaction.kind == .income ? .income : .expense)

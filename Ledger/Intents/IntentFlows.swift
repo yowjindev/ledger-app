@@ -186,14 +186,15 @@ enum IntentFlows {
         return savedOutcome(for: transaction, in: ledger)
     }
 
-    /// Reads balances: one row per active account, and the total when any opening balance is
-    /// known. Never modifies anything.
+    /// Reads balances: one row per active money account, then what's owed and the next due when
+    /// there are credit cards, pay later accounts, loans, or bills, and the total when any opening
+    /// balance is known. Never modifies anything.
     static func balances(in ledger: LedgerService) throws -> IntentOutcome {
         let sheet = try ledger.balanceSheet()
         let formatter = MoneyFormatter.current()
-        let active = sheet.activeBalances
-        guard !active.isEmpty else { throw LedgerIntentError.noActiveAccounts }
-        let rows = active.map { balance in
+        let active = sheet.moneyBalances
+        guard !sheet.activeBalances.isEmpty else { throw LedgerIntentError.noActiveAccounts }
+        let moneyRows = active.map { balance in
             ResultRow(
                 id: balance.id,
                 symbolName: balance.account.kind.systemImage,
@@ -202,12 +203,17 @@ enum IntentFlows {
                 value: balance.currentBalance.map { formatter.string($0) }
             )
         }
+        let owed = try owedRows(sheet: sheet, ledger: ledger, formatter: formatter)
+        let rows = moneyRows + owed.map(\.row)
         let liquid = sheet.liquidTotal
         let note = LiquidTotalCopy.note(for: liquid)
         guard !liquid.includedAccountIDs.isEmpty else {
             return IntentOutcome(headline: "Opening balances aren't set yet", body: note, bodyIsSentence: true, rows: rows, note: note)
         }
-        var body = rows.map { "\($0.title) \($0.value ?? "Not Set")" }.joined(separator: " · ")
+        var body = moneyRows.map { "\($0.title) \($0.value ?? "Not Set")" }.joined(separator: " · ")
+        for line in owed {
+            body += " · \(line.spoken)"
+        }
         if let note {
             body += ". \(note)"
         }
@@ -217,6 +223,42 @@ enum IntentFlows {
             rows: rows,
             note: note
         )
+    }
+
+    /// "You owe" with the total owed, and "Next due" with the first unpaid due, when they apply,
+    /// each with the words it's read out as.
+    private static func owedRows(
+        sheet: BalanceSheet,
+        ledger: LedgerService,
+        formatter: MoneyFormatter
+    ) throws -> [(row: ResultRow, spoken: String)] {
+        var rows: [(row: ResultRow, spoken: String)] = []
+        if !sheet.owedBalances.isEmpty {
+            let total = formatter.string(sheet.totalOwed)
+            rows.append((ResultRow(
+                id: UUID(),
+                symbolName: AccountKind.creditCard.systemImage,
+                title: "You owe",
+                subtitle: "Cards, pay later, and loans",
+                value: total
+            ), "You owe \(total)"))
+        }
+        if let next = try ledger.comingUp().first(where: { !$0.isPaid }) {
+            let name: String? = switch next.owner {
+            case .account(let id): try ledger.account(id: id)?.name
+            case .bill(let id): try ledger.bill(id: id)?.name
+            }
+            let date = DueStatusCopy.dateText(next, today: ledger.today, calendar: ledger.calendar)
+            let amount = DueStatusCopy.amountText(next, formatter: formatter)
+            rows.append((ResultRow(
+                id: UUID(),
+                symbolName: "calendar",
+                title: "Next due",
+                subtitle: [name, date].compactMap { $0 }.joined(separator: " · "),
+                value: amount
+            ), "Next: \([name, date.lowercased(), amount].compactMap { $0 }.joined(separator: ", "))"))
+        }
+        return rows
     }
 
     /// Brings an account to its real balance: asks for the account and the balance, then asks
@@ -234,6 +276,9 @@ enum IntentFlows {
         let accountID = try await resolve(account?.id) { try await askAccount("Which account do you want to update?").id }
         guard let target = try ledger.account(id: accountID) else { throw LedgerIntentError.ledger(.accountNotFound) }
         guard !target.isArchived else { throw LedgerIntentError.ledger(.accountArchived(name: target.name)) }
+        if target.kind.isOwed {
+            return try await updateOwed(in: ledger, target: target, amount: amount, askAmount: askAmount, confirm: confirm)
+        }
         let value = try await resolveAmount(amount, prompt: "What's \(target.name)'s real balance?", ask: askAmount)
 
         let formatter = MoneyFormatter.current()
@@ -284,6 +329,40 @@ enum IntentFlows {
         case .alreadyMatches:
             return IntentOutcome(headline: "\(target.name) already matches", body: balanceLine, bodyIsSentence: true, rows: [balance])
         }
+    }
+
+    /// Matches what a credit card, pay later account, or loan owes to the bank's figure: asks
+    /// for the amount, then asks before recording the change.
+    private static func updateOwed(
+        in ledger: LedgerService,
+        target: Account,
+        amount: Double?,
+        askAmount: Ask<Double>,
+        confirm: Confirm
+    ) async throws -> IntentOutcome {
+        let value = try await resolveAmount(amount, prompt: "What do you owe on \(target.name)?", ask: askAmount)
+        let formatter = MoneyFormatter.current()
+        let owedText = formatter.string(Money(value, currency: target.currency), alwaysShowCentavos: true)
+        let row = balanceRow(for: target, value: owedText, subtitle: "You owe")
+        switch try IntentLedger.perform({ try ledger.owedCorrection(toOwe: value, for: target) }) {
+        case .alreadyMatches:
+            return IntentOutcome(
+                headline: "\(target.name) already matches",
+                body: "You owe \(owedText) on \(target.name)",
+                bodyIsSentence: true,
+                rows: [row]
+            )
+        case .adjustment, .setOpeningBalance:
+            try await confirm("Change what you owe on \(target.name) to \(owedText)?", .continue)
+        }
+        _ = try IntentLedger.perform { try ledger.updateOwed(of: target, to: value, origin: .appIntent) }
+        Log.intents.info("Updated what an owed account owes from an App Intent")
+        return IntentOutcome(
+            headline: "Updated what you owe",
+            body: "You owe \(owedText) on \(target.name)",
+            bodyIsSentence: true,
+            rows: [row]
+        )
     }
 
     private static func balanceRow(for account: Account, value: String, subtitle: String) -> ResultRow {
@@ -412,10 +491,21 @@ enum IntentFlows {
         )]
         var balanceLines: [String] = []
         for account in [transaction.account, transaction.destinationAccount].compactMap({ $0 }) {
-            guard let current = sheet?.balance(for: account.id)?.currentBalance else { continue }
-            let amount = formatter.string(current, alwaysShowCentavos: true)
-            balanceLines.append("\(account.name) balance: \(amount)")
-            rows.append(ResultRow(id: account.id, symbolName: account.kind.systemImage, title: account.name, subtitle: "New balance", value: amount))
+            guard let balance = sheet?.balance(for: account.id), let current = balance.currentBalance else { continue }
+            if account.kind.isOwed, let owed = balance.owed {
+                // Money owed reads as what's owed, or as a credit, never as a negative balance.
+                let amount = formatter.string(owed.magnitude, alwaysShowCentavos: true)
+                let isCredit = owed.isNegative
+                balanceLines.append(isCredit ? "\(account.name) has a \(amount) credit" : "You owe \(amount) on \(account.name)")
+                rows.append(ResultRow(
+                    id: account.id, symbolName: account.kind.systemImage, title: account.name,
+                    subtitle: isCredit ? "Credit" : "You owe", value: amount
+                ))
+            } else {
+                let amount = formatter.string(current, alwaysShowCentavos: true)
+                balanceLines.append("\(account.name) balance: \(amount)")
+                rows.append(ResultRow(id: account.id, symbolName: account.kind.systemImage, title: account.name, subtitle: "New balance", value: amount))
+            }
         }
         return IntentOutcome(
             headline: "\(kind.title) saved",

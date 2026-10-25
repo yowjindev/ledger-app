@@ -81,7 +81,9 @@ extension Movement {
             accountID: transaction.account?.id,
             destinationAccountID: transaction.destinationAccount?.id,
             occurredAt: transaction.occurredAt,
-            direction: transaction.adjustmentDirection
+            direction: transaction.adjustmentDirection,
+            origin: transaction.origin,
+            planID: transaction.planID
         )
     }
 }

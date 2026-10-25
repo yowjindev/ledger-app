@@ -1,15 +1,19 @@
 import SwiftUI
 
-/// One transaction in a list: symbol, category or "Transfer", account, time, signed amount, and type.
+/// One transaction in a list: symbol, category or "Transfer", account, time, signed amount, and
+/// type, or the cashback a purchase earned in place of the type.
 struct TransactionRow: View {
     let transaction: LedgerTransaction
     /// Show the date as well as the time (for lists that aren't grouped by day).
     var showsDate = false
+    /// The cashback the purchase earned, shown beneath its amount.
+    var cashback: LedgerTransaction?
 
     @Environment(\.moneyFormatter) private var formatter
 
     var body: some View {
         let summary = TransactionSummary(transaction)
+        let cashbackText = cashback.map { "\(formatter.string($0.amount)) back" }
         HistoryRowLayout(
             symbolName: summary.symbolName,
             tint: LedgerTheme.badgeTint(for: summary.kind),
@@ -18,8 +22,10 @@ struct TransactionRow: View {
             occurredAt: summary.occurredAt,
             amountText: summary.signedAmountText(formatter: formatter),
             amountColor: LedgerTheme.amountColor(for: summary.kind),
-            caption: summary.kind?.title ?? "",
-            accessibilityLabel: summary.accessibilityLabel(formatter: formatter),
+            caption: cashbackText ?? summary.kind?.title ?? "",
+            accessibilityLabel: [summary.accessibilityLabel(formatter: formatter), cashback.map {
+                "\(formatter.string($0.amount, alwaysShowCentavos: true)) cashback"
+            }].compactMap { $0 }.joined(separator: ", "),
             showsDate: showsDate
         )
     }

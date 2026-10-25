@@ -61,8 +61,67 @@ enum SampleData {
                 )
                 try ledger.postDueInterest()
             }
+            try loadOwedAccounts(ledger: ledger, existing: accounts, expenses: expenses, hoursAgo: hoursAgo)
+            try loadBills(ledger: ledger, expenses: expenses, payFrom: accounts["PNB"])
         } catch {
             Log.persistence.error("Could not load sample data: \(String(describing: error), privacy: .private)")
+        }
+    }
+
+    /// A credit card with cashback and two purchases, a loan partway through, and a pay later
+    /// account. Skips any whose name is already taken.
+    private static func loadOwedAccounts(
+        ledger: LedgerService,
+        existing: [String: Account],
+        expenses: [String: LedgerCategory],
+        hoursAgo: (Double) -> Date
+    ) throws {
+        if existing["Visa card"] == nil {
+            let card = try ledger.createOwedAccount(
+                name: "Visa card",
+                kind: .creditCard,
+                terms: OwedTerms(statementDay: 5, dueDay: 25, creditLimit: 20_000, cashbackPercent: 1),
+                owedNow: 1_500,
+                stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 5, dueDay: 25)).map { _ in 1_200 }
+            )
+            for (amount, category, age) in [(Decimal(650), "Food", 4.0), (Decimal(250), "Shopping", 30.0)] {
+                if let category = expenses[category] {
+                    try ledger.recordExpense(amount: amount, accountID: card.id, categoryID: category.id, occurredAt: hoursAgo(age))
+                }
+            }
+        }
+        if existing["Phone loan"] == nil {
+            let nextDue = CalendarDay(containing: hoursAgo(-24 * 10), calendar: ledger.calendar)
+            try ledger.createLoan(
+                name: "Phone loan",
+                terms: PlanTerms(title: "Phone", monthly: 2_400, last: nil, months: 12, paidAtStart: 6, nextDue: nextDue),
+                purchase: nil
+            )
+        }
+        if existing["PayLater"] == nil {
+            try ledger.createOwedAccount(
+                name: "PayLater",
+                kind: .payLater,
+                terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000),
+                owedNow: 1_500,
+                stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 31, dueDay: 5)).map { _ in 1_500 }
+            )
+        }
+    }
+
+    /// Rent at a fixed amount and electricity whose amount varies. Skips any whose name is
+    /// already taken.
+    private static func loadBills(ledger: LedgerService, expenses: [String: LedgerCategory], payFrom: Account?) throws {
+        let existing = Set(try ledger.bills(includeArchived: true).map(\.name))
+        if !existing.contains("Rent"), let bills = expenses["Bills"] {
+            try ledger.createBill(BillTerms(
+                name: "Rent", categoryID: bills.id, dueDay: 25, amount: 8_000, arrivesDay: nil, payFromAccountID: payFrom?.id
+            ))
+        }
+        if !existing.contains("Electricity"), let bills = expenses["Bills"] {
+            try ledger.createBill(BillTerms(
+                name: "Electricity", categoryID: bills.id, dueDay: 30, amount: nil, arrivesDay: 19, payFromAccountID: nil
+            ))
         }
     }
 

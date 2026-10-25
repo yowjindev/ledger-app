@@ -16,7 +16,7 @@ struct AccountsView: View {
         content(balanceSheet)
             .navigationTitle("Accounts")
             .toolbar {
-                if balanceSheet.activeBalances.count > 1 {
+                if balanceSheet.moneyBalances.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
                         EditButton()
                     }
@@ -55,11 +55,11 @@ struct AccountsView: View {
                     AccountsTotalSummary(liquidTotal: balanceSheet.liquidTotal)
                 }
                 Section {
-                    if balanceSheet.activeBalances.isEmpty {
+                    if balanceSheet.moneyBalances.isEmpty {
                         Text("No active accounts. Add one, or open an archived account to unarchive it.")
                             .foregroundStyle(.secondary)
                     }
-                    ForEach(balanceSheet.activeBalances) { balance in
+                    ForEach(balanceSheet.moneyBalances) { balance in
                         NavigationLink(value: LedgerRoute.account(balance.id)) {
                             AccountListRow(balance: balance)
                         }
@@ -72,9 +72,9 @@ struct AccountsView: View {
                 } footer: {
                     Text(AccountsCopy.balanceFormula)
                 }
-                if !balanceSheet.archivedBalances.isEmpty {
+                if !archivedMoneyBalances(balanceSheet).isEmpty {
                     Section("Archived") {
-                        ForEach(balanceSheet.archivedBalances) { balance in
+                        ForEach(archivedMoneyBalances(balanceSheet)) { balance in
                             NavigationLink(value: LedgerRoute.account(balance.id)) {
                                 AccountListRow(balance: balance)
                             }
@@ -86,13 +86,18 @@ struct AccountsView: View {
         }
     }
 
-    /// Saves the order shown after a drag. Archived accounts keep their relative order after
-    /// the active ones, so every account ends up with a distinct position.
+    private func archivedMoneyBalances(_ balanceSheet: BalanceSheet) -> [AccountBalance] {
+        balanceSheet.archivedBalances.filter { !$0.account.kind.isOwed }
+    }
+
+    /// Saves the order shown after a drag. Accounts that owe money and archived accounts keep
+    /// their relative order after the active ones, so every account ends up with a distinct position.
     private func move(from source: IndexSet, to destination: Int, in balanceSheet: BalanceSheet) {
-        var activeIDs = balanceSheet.activeBalances.map(\.id)
+        var activeIDs = balanceSheet.moneyBalances.map(\.id)
         activeIDs.move(fromOffsets: source, toOffset: destination)
         let models = Dictionary(accounts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let ordered = (activeIDs + balanceSheet.archivedBalances.map(\.id)).compactMap { models[$0] }
+        let rest = balanceSheet.owedBalances.map(\.id) + balanceSheet.archivedBalances.map(\.id)
+        let ordered = (activeIDs + rest).compactMap { models[$0] }
         do {
             try LedgerService(context: modelContext).reorderAccounts(ordered)
         } catch {

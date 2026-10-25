@@ -68,4 +68,75 @@ final class SchemaMigrationTests: XCTestCase {
         XCTAssertNil(expense.basisRatePPM)
         XCTAssertEqual(try ledger.balance(of: savings)?.currentBalance?.amount, dec("12250.50"))
     }
+
+    func testVersion2StoreOpensWithEveryRecordAndDefaults() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "LedgerTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "Ledger.store", directoryHint: .notDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        do {
+            let schema = Schema(versionedSchema: LedgerSchemaV2.self)
+            let configuration = ModelConfiguration(schema: schema, url: url, allowsSave: true, cloudKitDatabase: .none)
+            let container = try ModelContainer(for: schema, configurations: [configuration])
+            let context = container.mainContext
+            let account = LedgerSchemaV2.Account(
+                name: "Savings",
+                kind: .bank,
+                openingBalanceMinor: 1_250_050,
+                createdAt: TestClock.referenceDate,
+                sortOrder: 0
+            )
+            account.interestRatePPM = 32_500
+            let food = LedgerSchemaV2.LedgerCategory(
+                name: "Food",
+                kind: .expense,
+                symbolName: "fork.knife",
+                createdAt: TestClock.referenceDate,
+                sortOrder: 0
+            )
+            context.insert(account)
+            context.insert(food)
+            context.insert(LedgerSchemaV2.LedgerTransaction(
+                kind: .expense,
+                amountMinor: 25_000,
+                currency: .php,
+                occurredAt: TestClock.referenceDate,
+                createdAt: TestClock.referenceDate,
+                note: nil,
+                account: account,
+                destinationAccount: nil,
+                category: food,
+                origin: .app,
+                reference: nil,
+                requestID: nil
+            ))
+            try context.save()
+        }
+
+        let container = try LedgerStore.makeContainer(storage: .onDisk(url))
+        let context = container.mainContext
+        let ledger = LedgerService(context: context, clock: { TestClock.referenceDate })
+        let savings = try XCTUnwrap(try ledger.accounts().first)
+        XCTAssertEqual(savings.name, "Savings")
+        XCTAssertEqual(savings.interestRatePPM, 32_500)
+        XCTAssertNil(savings.statementDay)
+        XCTAssertNil(savings.dueDay)
+        XCTAssertNil(savings.creditLimitMinor)
+        XCTAssertNil(savings.cashbackRatePPM)
+        XCTAssertTrue(savings.strictReminder)
+        XCTAssertNil(savings.dueSchedule)
+        let expense = try XCTUnwrap(try ledger.transactions().first)
+        XCTAssertEqual(expense.category?.name, "Food")
+        XCTAssertNil(expense.sourceTransactionID)
+        XCTAssertNil(expense.planID)
+        XCTAssertNil(expense.billID)
+        XCTAssertNil(expense.billCycle)
+        XCTAssertTrue(expense.isEditable)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<PaymentPlan>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Bill>()), 0)
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<DueOverride>()), 0)
+        XCTAssertEqual(try ledger.balance(of: savings)?.currentBalance?.amount, dec("12250.50"))
+    }
 }

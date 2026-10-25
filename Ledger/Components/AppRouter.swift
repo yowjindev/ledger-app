@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SwiftData
 import SwiftUI
 
 /// What the transaction editor sheet should do.
@@ -49,6 +50,7 @@ final class AppRouter {
 enum LedgerRoute: Hashable, Sendable {
     case transaction(UUID)
     case account(UUID)
+    case bill(UUID)
     /// The automatic interest credited at one moment, for one account or every account.
     case interest(postedAt: Date, accountID: UUID?)
 }
@@ -61,10 +63,32 @@ extension View {
             case .transaction(let id):
                 TransactionDetailView(transactionID: id)
             case .account(let id):
-                AccountDetailView(accountID: id)
+                AccountDestination(accountID: id)
+            case .bill(let id):
+                BillDetailView(billID: id)
             case .interest(let postedAt, let accountID):
                 InterestPostingDetailView(postedAt: postedAt, accountID: accountID)
             }
+        }
+    }
+}
+
+/// Shows an account's screen: the one for money owed when it's a credit card, pay later
+/// account, or loan, otherwise the money account screen.
+private struct AccountDestination: View {
+    let accountID: UUID
+    @Query private var matches: [Account]
+
+    init(accountID: UUID) {
+        self.accountID = accountID
+        _matches = Query(filter: #Predicate<Account> { $0.id == accountID })
+    }
+
+    var body: some View {
+        if matches.first?.kind.isOwed == true {
+            OwedAccountDetailView(accountID: accountID)
+        } else {
+            AccountDetailView(accountID: accountID)
         }
     }
 }

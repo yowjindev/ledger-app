@@ -38,6 +38,7 @@ extension LedgerService {
         openingBalance: Decimal?,
         currency: CurrencyCode = .php
     ) throws -> Account {
+        guard !kind.isOwed else { throw LedgerError.wrongAccountGroup }
         let existing = try accounts(includeArchived: true)
         let cleanName = try validatedName(name, existingNames: existing.map(\.name))
         let openingMinor = try openingBalance.map { try AmountRules.openingBalanceMinorUnits($0, currency: currency) }
@@ -57,7 +58,9 @@ extension LedgerService {
 
     /// Renames an account, changes its kind, or corrects its opening balance. Transactions keep
     /// referencing the same account, so history shows the new name.
+    /// Accounts that owe money use `updateOwedAccount(_:name:terms:)` instead.
     func updateAccount(_ account: Account, name: String, kind: AccountKind, openingBalance: Decimal?) throws {
+        guard !account.kind.isOwed, !kind.isOwed else { throw LedgerError.wrongAccountGroup }
         let others = try accounts(includeArchived: true).filter { $0.id != account.id }
         let cleanName = try validatedName(name, existingNames: others.map(\.name))
         let openingMinor = try openingBalance.map {
@@ -72,6 +75,7 @@ extension LedgerService {
 
     /// Sets or clears (`nil`) an account's opening balance.
     func setOpeningBalance(_ openingBalance: Decimal?, for account: Account) throws {
+        guard !account.kind.isOwed else { throw LedgerError.wrongAccountGroup }
         account.openingBalanceMinor = try openingBalance.map {
             try AmountRules.openingBalanceMinorUnits($0, currency: account.currency)
         }
@@ -113,6 +117,9 @@ extension LedgerService {
         guard try transactionCount(for: account) == 0 else {
             throw LedgerError.accountHasTransactions(name: account.name)
         }
+        for override in try dueOverrides(for: account.id) {
+            context.delete(override)
+        }
         context.delete(account)
         try commit()
         Log.ledger.info("Deleted an account")
@@ -136,6 +143,7 @@ extension LedgerService {
         var plan: [(account: Account, change: AccountSetupChange)] = []
         for choice in choices {
             guard let account = try account(id: choice.accountID) else { throw LedgerError.accountNotFound }
+            guard !account.kind.isOwed else { throw LedgerError.wrongAccountGroup }
             if choice.isUsed {
                 let openingMinor = try choice.currentBalance.map {
                     try openingBalanceMinorUnits(forCurrentBalance: $0, of: account, activity: sheet.balance(for: account.id)?.netActivity)

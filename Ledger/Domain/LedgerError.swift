@@ -30,6 +30,24 @@ enum LedgerError: Error, Equatable, Sendable {
     case interestRateOutOfRange
     case taxRateOutOfRange
     case rateTooPrecise
+    case owedNegative
+    case wrongAccountGroup
+    case dayOutOfRange
+    case statementDayRequired
+    case cashbackNotOffered
+    case cashbackRateOutOfRange
+    case stillDueNotApplicable
+    case stillDueAboveOwed
+    case stillDueRequired
+    case splitNotOffered
+    case planMonthsOutOfRange(range: ClosedRange<Int>)
+    case planTotalBelowPrice
+    case paidMonthsOutOfRange
+    case dueDateNotOnSchedule
+    case billHasPayments(name: String)
+    case arrivalDayNotApplicable
+    case moveDateOutOfRange
+    case billNotFound
     case persistenceFailed
 }
 
@@ -92,6 +110,42 @@ extension LedgerError: LocalizedError {
             "Enter a tax rate from 0% to 100%."
         case .rateTooPrecise:
             "Rates can have at most four decimal places."
+        case .owedNegative:
+            "What you owe can't be negative."
+        case .wrongAccountGroup:
+            "Money you have and money you owe are kept apart, so this can't be changed."
+        case .dayOutOfRange:
+            "Choose a day from 1 to 31."
+        case .statementDayRequired:
+            "Choose the day the statement closes."
+        case .cashbackNotOffered:
+            "Only credit cards can have cashback."
+        case .cashbackRateOutOfRange:
+            "Enter a cashback rate above 0% and up to 100%."
+        case .stillDueNotApplicable:
+            "No bill is waiting for payment right now. Leave this empty."
+        case .stillDueAboveOwed:
+            "What's still due can't be more than the total you owe."
+        case .stillDueRequired:
+            "Enter what's still due on your last statement, or 0 if it's paid."
+        case .splitNotOffered:
+            "Only pay later purchases can be split."
+        case .planMonthsOutOfRange(let range):
+            "Choose from \(range.lowerBound) to \(range.upperBound) months."
+        case .planTotalBelowPrice:
+            "The payments add up to less than the price. Check the monthly amount."
+        case .paidMonthsOutOfRange:
+            "Months paid must be fewer than the total months."
+        case .dueDateNotOnSchedule:
+            "Choose one of this account's due dates."
+        case .billHasPayments(let name):
+            "\(name) has payments, so it can't be deleted. Archive it instead."
+        case .arrivalDayNotApplicable:
+            "Only bills whose amount varies have an arrival day."
+        case .moveDateOutOfRange:
+            "Choose a date from today up to the day before next month's due date."
+        case .billNotFound:
+            "That bill no longer exists."
         case .persistenceFailed:
             "Ledger couldn't save. No changes were made."
         }

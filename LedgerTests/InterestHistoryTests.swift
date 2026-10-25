@@ -36,7 +36,7 @@ final class InterestHistoryTests: XCTestCase {
     private func shape(_ items: [HistoryItem]) -> [String] {
         items.map { item in
             switch item {
-            case .transaction(let transaction): "transaction \(transaction.amountMinor)"
+            case .transaction(let transaction, _): "transaction \(transaction.amountMinor)"
             case .interest(let posting): "interest \(posting.entries.count)"
             }
         }

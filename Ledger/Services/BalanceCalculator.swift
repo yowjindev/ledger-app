@@ -24,6 +24,9 @@ struct Movement: Hashable, Sendable {
     let occurredAt: Date
     /// For adjustments, whether the balance went up or down; `nil` for other kinds.
     let direction: AdjustmentDirection?
+    let origin: EntryOrigin
+    /// The payment plan a split purchase or its fees belong to.
+    let planID: UUID?
 
     init(
         kind: TransactionKind,
@@ -33,7 +36,9 @@ struct Movement: Hashable, Sendable {
         accountID: UUID?,
         destinationAccountID: UUID?,
         occurredAt: Date,
-        direction: AdjustmentDirection? = nil
+        direction: AdjustmentDirection? = nil,
+        origin: EntryOrigin = .app,
+        planID: UUID? = nil
     ) {
         self.kind = kind
         self.status = status
@@ -43,6 +48,8 @@ struct Movement: Hashable, Sendable {
         self.destinationAccountID = destinationAccountID
         self.occurredAt = occurredAt
         self.direction = direction
+        self.origin = origin
+        self.planID = planID
     }
 }
 
@@ -70,6 +77,10 @@ struct AccountBalance: Identifiable, Hashable, Sendable {
     /// Opening balance plus net activity. `nil` while the opening balance is unknown, because
     /// the current balance can't be known either.
     var currentBalance: Money? { openingBalance.map { $0 + netActivity } }
+
+    /// What an account that owes money owes now: its balance with the sign flipped. Negative
+    /// when it holds a credit, `nil` while the opening balance is unknown.
+    var owed: Money? { currentBalance.map { -$0 } }
 }
 
 /// The total of liquid account balances.
@@ -93,6 +104,20 @@ struct BalanceSheet: Hashable, Sendable {
 
     var activeBalances: [AccountBalance] { balances.filter { !$0.account.isArchived } }
     var archivedBalances: [AccountBalance] { balances.filter { $0.account.isArchived } }
+    /// Active accounts that hold money the user has.
+    var moneyBalances: [AccountBalance] { activeBalances.filter { !$0.account.kind.isOwed } }
+    /// Active credit cards, pay later accounts, and loans.
+    var owedBalances: [AccountBalance] { activeBalances.filter { $0.account.kind.isOwed } }
+
+    /// The sum of what active owed accounts owe, credits included; accounts whose opening
+    /// balance is unknown are left out.
+    var totalOwed: Money {
+        let currency = liquidTotal.total.currency
+        return owedBalances
+            .filter { $0.account.currency == currency }
+            .compactMap(\.owed)
+            .reduce(Money.zero(currency), +)
+    }
 
     func balance(for accountID: UUID) -> AccountBalance? {
         balances.first { $0.id == accountID }
