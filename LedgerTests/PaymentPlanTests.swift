@@ -160,6 +160,46 @@ final class PaymentPlanTests: XCTestCase {
         XCTAssertEqual(try planCount(h), 0)
     }
 
+    func testExistingSplitWithPriceStoresItsFees() throws {
+        let h = try harness()
+        let account = try payLater(h)
+
+        let plan = try h.ledger.addExistingPlan(
+            PlanTerms(title: "Headphones", monthly: 550, last: nil, months: 2, paidAtStart: 0, nextDue: day(2026, 4, 5), price: 1_000),
+            to: account
+        )
+
+        XCTAssertEqual(plan.feesMinor, 10_000)
+        XCTAssertEqual(PlanSnapshot(plan)?.feesMinor, 10_000)
+        XCTAssertEqual(try h.transactionCount(), 0)
+    }
+
+    func testExistingSplitPriceAboveItsPaymentsIsRefused() throws {
+        let h = try harness()
+        let account = try payLater(h)
+
+        assertThrowsLedgerError(.planTotalBelowPrice) {
+            try h.ledger.addExistingPlan(
+                PlanTerms(title: "Headphones", monthly: 450, last: nil, months: 2, paidAtStart: 0, nextDue: day(2026, 4, 5), price: 1_000),
+                to: account
+            )
+        }
+        XCTAssertEqual(try planCount(h), 0)
+    }
+
+    func testExistingSplitWithoutPriceHasUnknownFees() throws {
+        let h = try harness()
+        let account = try payLater(h)
+
+        let plan = try h.ledger.addExistingPlan(
+            PlanTerms(title: "Headphones", monthly: 550, last: nil, months: 2, paidAtStart: 0, nextDue: day(2026, 4, 5)),
+            to: account
+        )
+
+        XCTAssertNil(plan.feesMinor)
+        XCTAssertEqual(PlanSnapshot(plan)?.feesMinor, 0)
+    }
+
     // MARK: Loans
 
     func testLoanPartwaySetsOpeningFromRemainingSlices() throws {

@@ -23,6 +23,13 @@ struct ExistingPlanView: View {
                     TextField("What It's For", text: $input.title)
                         .textInputAutocapitalization(.sentences)
                 }
+                if account.kind == .payLater {
+                    Section {
+                        AmountField("Item Price", amount: $input.price, accessibilityLabel: "Item price")
+                    } footer: {
+                        Text("Optional. With the price, Ledger knows which part is fees, which most pay later services leave out of your available limit.")
+                    }
+                }
                 Section {
                     PlanPaymentRows(input: $input, months: account.kind == .loan ? LedgerService.loanMonths : LedgerService.splitMonths)
                     Picker("Next Payment", selection: $nextDue) {

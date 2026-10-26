@@ -9,6 +9,8 @@ struct PlanPaymentsInput: Equatable {
     var last: Decimal?
     var months = 12
     var paidAtStart = 0
+    /// The item's price, for a split already under way.
+    var price: Decimal?
 
     var isComplete: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -24,7 +26,8 @@ struct PlanPaymentsInput: Equatable {
             last: hasDifferentLast ? last : nil,
             months: months,
             paidAtStart: paidAtStart,
-            nextDue: nextDue
+            nextDue: nextDue,
+            price: price
         )
     }
 }
