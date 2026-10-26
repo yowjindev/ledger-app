@@ -10,6 +10,8 @@ struct OwedTerms: Equatable, Sendable {
     var creditLimit: Decimal?
     /// Cashback on purchases as a percentage, credit cards only.
     var cashbackPercent: Decimal?
+    /// The fee added to each month of a split as a percentage of the price, pay later only.
+    var splitFeePercent: Decimal?
     /// Whether the service counts fees against the limit, pay later only.
     var feesUseLimit: Bool
 
@@ -18,12 +20,14 @@ struct OwedTerms: Equatable, Sendable {
         dueDay: Int,
         creditLimit: Decimal? = nil,
         cashbackPercent: Decimal? = nil,
+        splitFeePercent: Decimal? = nil,
         feesUseLimit: Bool = false
     ) {
         self.statementDay = statementDay
         self.dueDay = dueDay
         self.creditLimit = creditLimit
         self.cashbackPercent = cashbackPercent
+        self.splitFeePercent = splitFeePercent
         self.feesUseLimit = feesUseLimit
     }
 }
@@ -127,6 +131,7 @@ extension LedgerService {
         let schedule: DueSchedule
         let creditLimitMinor: Int64?
         let cashbackRatePPM: Int64?
+        let splitFeeRatePPM: Int64?
         let feesUseLimit: Bool
 
         func apply(to account: Account) {
@@ -134,6 +139,7 @@ extension LedgerService {
             account.dueDay = schedule.dueDay
             account.creditLimitMinor = creditLimitMinor
             account.cashbackRatePPM = cashbackRatePPM
+            account.splitFeeRatePPM = splitFeeRatePPM
             account.feesUseLimit = feesUseLimit
         }
     }
@@ -154,10 +160,15 @@ extension LedgerService {
             guard kind == .creditCard else { throw LedgerError.cashbackNotOffered }
             cashbackPPM = try RateRules.cashbackRate(percent: percent).partsPerMillion
         }
+        var splitFeePPM: Int64?
+        if kind == .payLater, let percent = terms.splitFeePercent {
+            splitFeePPM = try RateRules.splitFeeRate(percent: percent).partsPerMillion
+        }
         return ValidatedOwedTerms(
             schedule: DueSchedule(statementDay: statementDay, dueDay: terms.dueDay),
             creditLimitMinor: limitMinor,
             cashbackRatePPM: cashbackPPM,
+            splitFeeRatePPM: splitFeePPM,
             feesUseLimit: kind == .payLater && terms.feesUseLimit
         )
     }

@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Sheet for adding a credit card or pay later account, or editing one: its name, statement and
-/// due days, limit, and cashback. When adding, it also asks what's owed now and what's still
+/// due days, limit, and cashback or monthly fee. When adding, it also asks what's owed now and what's still
 /// due on a statement that has already closed.
 struct OwedAccountEditorView: View {
     private enum Field: Hashable {
@@ -11,6 +11,7 @@ struct OwedAccountEditorView: View {
         case stillDue
         case limit
         case cashback
+        case splitFee
     }
 
     let kind: AccountKind
@@ -25,6 +26,7 @@ struct OwedAccountEditorView: View {
     @State private var dueDay: Int
     @State private var limit: Decimal?
     @State private var cashbackText: String
+    @State private var splitFeeText: String
     @State private var feesUseLimit: Bool
     @State private var owedNow: Decimal?
     @State private var stillDue: Decimal?
@@ -42,6 +44,7 @@ struct OwedAccountEditorView: View {
         var dueDay: Int
         var limit: Decimal?
         var cashbackText: String
+        var splitFeeText: String
         var feesUseLimit: Bool
         var owedNow: Decimal?
         var stillDue: Decimal?
@@ -60,6 +63,7 @@ struct OwedAccountEditorView: View {
             dueDay: account?.dueDay ?? (kind == .payLater ? 5 : 25),
             limit: account?.creditLimit?.amount,
             cashbackText: account?.cashbackRate?.editableText() ?? "",
+            splitFeeText: account?.splitFeeRate?.editableText() ?? "",
             feesUseLimit: account?.feesUseLimit ?? false,
             owedNow: nil,
             stillDue: nil
@@ -70,6 +74,7 @@ struct OwedAccountEditorView: View {
         _dueDay = State(initialValue: snapshot.dueDay)
         _limit = State(initialValue: snapshot.limit)
         _cashbackText = State(initialValue: snapshot.cashbackText)
+        _splitFeeText = State(initialValue: snapshot.splitFeeText)
         _feesUseLimit = State(initialValue: snapshot.feesUseLimit)
     }
 
@@ -99,16 +104,17 @@ struct OwedAccountEditorView: View {
                         AmountField(BillsCopy.limitTitle(for: kind), amount: $limit)
                             .focused($focusedField, equals: .limit)
                         if kind == .creditCard {
-                            cashbackField
+                            percentField("Cashback", text: $cashbackText, unit: "% back", field: .cashback)
                         }
                         if kind == .payLater {
+                            percentField("Monthly Fee", text: $splitFeeText, unit: "% a month", field: .splitFee)
                             Toggle("Fees Use the Limit", isOn: $feesUseLimit)
                         }
                     } footer: {
                         if kind == .creditCard {
                             Text("Cashback is added automatically to every purchase you log on this card, rounded down to the centavo.")
                         } else if kind == .payLater {
-                            Text("Turn on if this service's available limit goes down by its fees or interest too.")
+                            Text("The monthly fee fills in each payment when you split a purchase: the price split evenly, plus this share of the price each month. Turn on Fees Use the Limit if this service's available limit goes down by its fees too.")
                         }
                     }
                 }
@@ -184,24 +190,25 @@ struct OwedAccountEditorView: View {
         }
     }
 
-    private var cashbackField: some View {
-        LabeledContent("Cashback") {
+    /// A percentage typed on the decimal pad, with its unit after it, such as "1 % back".
+    private func percentField(_ title: String, text: Binding<String>, unit: String, field: Field) -> some View {
+        LabeledContent(title) {
             HStack(spacing: 4) {
-                TextField("Cashback", text: $cashbackText, prompt: Text("0"))
+                TextField(title, text: text, prompt: Text("0"))
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .monospacedDigit()
-                    .focused($focusedField, equals: .cashback)
-                    .onChange(of: cashbackText) { _, newValue in
+                    .focused($focusedField, equals: field)
+                    .onChange(of: text.wrappedValue) { _, newValue in
                         let sanitized = AmountParser.sanitize(
                             newValue,
                             locale: locale,
                             maximumFractionDigits: RateRules.maximumFractionDigits,
                             maximumIntegerDigits: 3
                         )
-                        if sanitized != newValue { cashbackText = sanitized }
+                        if sanitized != newValue { text.wrappedValue = sanitized }
                     }
-                Text("% back")
+                Text(unit)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
             }
@@ -216,7 +223,7 @@ struct OwedAccountEditorView: View {
     private var current: Snapshot {
         Snapshot(
             name: name, statementDay: statementDay, dueDay: dueDay, limit: limit,
-            cashbackText: cashbackText, feesUseLimit: feesUseLimit, owedNow: owedNow, stillDue: stillDue
+            cashbackText: cashbackText, splitFeeText: splitFeeText, feesUseLimit: feesUseLimit, owedNow: owedNow, stillDue: stillDue
         )
     }
 
@@ -231,11 +238,13 @@ struct OwedAccountEditorView: View {
 
     private var terms: OwedTerms {
         let cashback = cashbackText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Rate.parse(cashbackText, locale: locale)
+        let splitFee = splitFeeText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Rate.parse(splitFeeText, locale: locale)
         return OwedTerms(
             statementDay: kind == .loan ? nil : statementDay,
             dueDay: dueDay,
             creditLimit: limit,
             cashbackPercent: cashback,
+            splitFeePercent: splitFee,
             feesUseLimit: feesUseLimit
         )
     }

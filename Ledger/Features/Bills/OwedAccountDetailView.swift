@@ -262,6 +262,9 @@ struct OwedAccountDetailView: View {
             if let cashback = account.cashbackRate {
                 LabeledContent("Cashback", value: "\(cashback.percent.formatted())% back")
             }
+            if let fee = account.splitFeeRate {
+                LabeledContent("Monthly Fee", value: "\(fee.percent.formatted())% a month")
+            }
         }
     }
 
