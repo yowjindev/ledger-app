@@ -98,10 +98,10 @@ struct SplitPlanSection: View {
 
     var body: some View {
         Section {
-            Toggle("Split Into Months", isOn: splitting.animation())
+            Toggle("Payment Plan", isOn: splitting.animation())
             if input.isOn {
                 Stepper(value: $input.months, in: LedgerService.splitMonths) {
-                    LabeledContent("Months", value: "\(input.months)")
+                    LabeledContent("Months", value: PlanCopy.planMonths(input.months))
                 }
                 feeField
                 AmountField("Each Payment", amount: payment, accessibilityLabel: "Each monthly payment")
@@ -171,7 +171,7 @@ struct SplitPlanSection: View {
     }
 
     private var footer: String {
-        guard input.isOn else { return "Paying next month or in 3, 6, or more months? Split it to track each payment on its due date." }
+        guard input.isOn else { return "Paying next month or in 3, 6, or more months? Turn on Payment Plan to add the service's fee and track each payment on its due date." }
         guard let price, let monthly = input.monthly else {
             if !input.feeText.isEmpty {
                 return "Enter the price above and each payment fills in from the monthly fee. Check it against your pay later app and change it if it differs. Payments start on this account's next due date."
