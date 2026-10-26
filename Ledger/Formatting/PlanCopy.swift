@@ -7,6 +7,11 @@ enum PlanCopy {
         paid >= months ? "Paid off" : "\(paid) of \(months) paid"
     }
 
+    /// A pay later plan's length as the services show it: "1× (next month)", "3×".
+    static func planMonths(_ months: Int) -> String {
+        months == 1 ? "1× (next month)" : "\(months)×"
+    }
+
     /// What a split's payments cost over the price, such as "You'll pay ₱1,100.00 in all: ₱100.00
     /// more than the price, recorded as fees and interest. That's ₱50.00 a month, 5% of the price."
     /// The share is the fee for one month as a percentage of the price, to one decimal place.
