@@ -102,14 +102,14 @@ enum SampleData {
             let payLater = try ledger.createOwedAccount(
                 name: "PayLater",
                 kind: .payLater,
-                terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000),
+                terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000, splitFeePercent: 5),
                 owedNow: 1_500,
                 stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 31, dueDay: 5)).map { _ in 1_500 }
             )
             if let shopping = expenses["Shopping"] {
                 try ledger.recordSplitPurchase(SplitPurchase(
                     amount: 1_200, accountID: payLater.id, categoryID: shopping.id, occurredAt: hoursAgo(48),
-                    note: "Earbuds", months: 3, monthly: 420, last: nil
+                    note: "Earbuds", months: 3, monthly: 460, last: nil
                 ))
             }
         }

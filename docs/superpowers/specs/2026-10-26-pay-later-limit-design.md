@@ -38,13 +38,15 @@ Ledger also can't record a 1× purchase with a fee as a split today: splits star
   known too.
 - While splitting a purchase, the user sees the fee per month and as a share of the price, to
   catch a typo against the service's checkout screen.
+- The user sees and sets the service's fee: each pay later account has a **Monthly Fee** (for
+  example 5% a month), and splitting a purchase fills in each payment from it, which the user can
+  change to match the app (a promo, or the app's own rounding).
 - Services differ: the user tracks several pay later services (TikTok PayLater, SPayLater) and
   only TikTok's behavior is known. Each pay later account has a **Fees Use the Limit** switch,
   off by default, for a service that does count its fees or interest against the limit.
 
 ## Non-goals
 
-- Storing a fee rate, or filling in payments from one.
 - Late fees and other charges outside a split. They keep counting against the limit, as today.
 - Credit cards. Banks count interest and fees against a card's limit, so cards keep limit less
   owed. Cards can't have splits, so nothing about them changes.
@@ -117,6 +119,19 @@ that amount; the fees stay counted until the due is fully paid.
 - Changing it changes only the available limit; plans and their fees stay as they are, so
   turning it off again restores the earlier figure.
 
+### Monthly fee and filled-in payments
+
+- `LedgerSchemaV5` adds `Account.splitFeeRatePPM: Int64?` (5% is 50_000), set in the pay later
+  account editor as **Monthly Fee** ("% a month", above 0% and at most 100%, blank for none) and
+  shown under Billing on the account screen. Other kinds don't store it.
+- Splitting a purchase shows a **Monthly Fee** field, filled in from the account and editable for
+  this purchase (0 for a promo). Each payment fills in as the price ÷ months plus the fee × the
+  price, each rounded to the centavo with halves up (`LedgerService.splitPayment`).
+- A payment the user types is kept while the price, months or fee change; clearing it lets the
+  fee fill it in again. Without a fee, nothing is filled in: no made-up payment.
+- The service's own rounding can differ by a centavo, so the payment stays the user's to check
+  against the app; the fees entry is still the payments' total less the price.
+
 ### Splitting a purchase (transaction editor)
 
 - Months go from 1 to 60 for pay later, in the editor and in `LedgerService.splitMonths`. At 1
@@ -178,6 +193,9 @@ Made-up amounts only. At least:
 - Item Price is optional and shown for pay later only, whatever the Fees Use the Limit switch
   says, so the fees are known if the switch is turned off later.
 - Fees Use the Limit is off by default, matching the one service whose behavior is known.
+- The monthly fee lives on the account in a new schema version (V5) rather than in V4, since a
+  V4 store may already exist on the user's iPhone.
+- Filled-in payments round each part half up; a blank fee fills nothing in.
 - The share of the price is shown to one decimal place.
 
 ## Open questions
