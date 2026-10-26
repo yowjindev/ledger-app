@@ -18,6 +18,7 @@ struct SettingsView: View {
             moneySection
             displaySection
             preferencesSection
+            ReminderSettingsSection()
 
             Section {
                 NavigationLink {

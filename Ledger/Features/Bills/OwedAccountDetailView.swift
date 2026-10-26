@@ -68,6 +68,9 @@ struct OwedAccountDetailView: View {
                 periodSection(schedule: schedule, history: history, today: today)
             }
             billingSection(account)
+            if !account.isArchived {
+                StrictReminderToggle(owner: .account(account.id), isOn: account.strictReminder)
+            }
             transactionsSection(history)
             actionsSection(account: account, balance: balance, hasTransactions: !history.isEmpty, left: status?.left)
         }

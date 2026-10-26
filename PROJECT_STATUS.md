@@ -23,7 +23,7 @@ _Last updated: 2026-10-26_
 
 ## Verification evidence
 
-- **Unit tests:** 351 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
+- **Unit tests:** 379 pass, 0 fail (`xcodebuild … -scheme Ledger test`). The 12 required cases
   are in `LedgerTests/LedgerServiceTests.swift`. Other suites cover rollback after a failed save
   for every kind of change, idempotency, time zones, parsing and formatting, onboarding setup,
   Activity search and filters, the bank-email reader, the App Intent flows and the result list,
@@ -32,7 +32,8 @@ _Last updated: 2026-10-26_
   and debts add billing cycles and month-end due days, what's left on each due (early, partial,
   over and overdue payments, a statement still due at setup, local-time cut-offs), cashback kept
   in step with its purchase, split purchases and loans, regular bills, moving one due, and the
-  Ledger Menu for money owed.
+  Ledger Menu for money owed. Reminders add the planner (strict and plain modes, snoozes, moved
+  and overdue dues, arrival days, caps), notification requests, and the Live Activity buttons.
 - **Builds:** Debug and Release for the simulator and an arm64 iPhone build, all with zero
   warnings. App Intents metadata is extracted at build time.
 - **Screens:** every screen checked in light mode, dark mode and at accessibility text sizes.
@@ -67,6 +68,15 @@ _Last updated: 2026-10-26_
   bill's amount, cashback after turning a rate off, a blank "still due", a bill already paid at
   setup, owed balances in Shortcuts results) and stuck loan details are fixed, each with a test.
   Not yet tried on the iPhone.
+- **Due reminders (2026-10-26, simulator):** the Reminders settings and the per-item Strict
+  Reminder toggle; with a bill due today, the Live Activity in the Dynamic Island (compact and
+  expanded) and on the Lock Screen, in light and dark, with no amounts; tapping **Paid** opened the
+  prefilled payment. Shortcuts UI tests 01 and 03 pass with the logging intents adopting Live
+  Activity intents. The widget extension builds for the simulator and an arm64 device with zero
+  warnings. A whole-branch review found one critical and three important issues (a background
+  refresh could drop scheduled starts, strict days past the start cap went silent, overlapping
+  refreshes, wording of a start after midnight) plus month-end arrival notices; all are fixed,
+  each with a test. Not yet tried on the iPhone.
 
 ## Decisions
 
@@ -102,6 +112,11 @@ _Last updated: 2026-10-26_
   the account owes already includes it.
 - **Regular bills:** monthly, with a fixed or varying amount. A payment is an expense tagged with
   its bill and month. One month's due can be moved without changing the others.
+- **Reminders:** planned by a pure `ReminderPlanner` and applied by `ReminderScheduler` after
+  every save and on activation. Strict mode uses a Live Activity scheduled ahead with ActivityKit
+  (no push server), started at the reminder time and again 8 hours later until paid; otherwise
+  notifications. Nothing shown on the Lock Screen includes an amount. Snoozes are kept in
+  `UserDefaults`. Paid and Move open the app; Paid never moves money by itself.
 - **Intents require an unlocked iPhone** (`.requiresAuthentication`), because they read or
   change financial data. To allow logging from a locked phone, change the `authenticationPolicy`
   lines in `Ledger/Intents/LedgerIntents.swift` to `.alwaysAllowed`. That lets anyone holding the
@@ -130,8 +145,9 @@ _Last updated: 2026-10-26_
 7. On the iPhone, add a credit card, a pay later account and a loan as they stand today, then
    compare each due and amount left with the bank's app through one billing cycle. Check that
    cashback matches what the bank credits.
-8. Due-date reminders (notifications and a Live Activity) are designed but not built yet; see
-   `docs/superpowers/specs/2026-10-26-bills-debts-and-reminders-design.md`, Part B.
+8. On the iPhone, with a bill or card due tomorrow: check the heads-up notification, that the
+   Live Activity starts on its own at the reminder time with Ledger closed, the 8-hour comeback,
+   Snooze (1 and 3 hours), Move, Paid, and swiping it away.
 
 If a step fails on the device, look in Console.app for the app's messages in the `intents`
 category.
@@ -149,6 +165,10 @@ category.
 - Credit card purchases can't be split into installments; only pay later purchases and loans can.
 - Purchases logged with dates before an owed account was added change what it owes, the same way
   backdated entries change any balance; Update What You Owe brings it back in line.
-- Single currency (PHP); no export, import, sync, widgets or Apple Watch app; iPhone only.
+- iOS lets Ledger line up a Live Activity only while Ledger or one of its shortcuts runs, and caps
+  how many can be pending, so reminders more than a day or two ahead rely on Ledger being opened
+  in between. Notifications are scheduled up to 14 days ahead.
+- Single currency (PHP); no export, import, sync, Home Screen widgets or Apple Watch app; iPhone
+  only. The only widget is the due reminder Live Activity.
 - Search and filtering run in memory, which is fine at personal scale. Tens of thousands of
   records would call for predicate-based queries.

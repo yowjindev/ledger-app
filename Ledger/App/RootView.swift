@@ -11,6 +11,7 @@ struct RootView: View {
     @AppStorage(DisplayPreferences.Keys.symbolStyle) private var symbolStyle: CurrencySymbolStyle = .symbol
     @AppStorage(DisplayPreferences.Keys.centavos) private var centavos: CentavoDisplay = .always
     @State private var router = AppRouter(selectedTab: AppLaunchConfiguration.current.initialTab ?? .dashboard)
+    @State private var reminderRouting = ReminderRouting.shared
 
     var body: some View {
         TabView(selection: $router.selectedTab) {
@@ -47,6 +48,7 @@ struct RootView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .postingDueInterest()
+        .refreshingReminders()
         .task {
             if let kind = AppLaunchConfiguration.current.initialEditorKind {
                 router.addTransaction(kind)
@@ -54,6 +56,10 @@ struct RootView: View {
         }
         .sheet(item: $router.editorRequest) { request in
             TransactionEditorView(request: request)
+                .environment(\.moneyFormatter, formatter)
+        }
+        .sheet(item: $reminderRouting.pending) { route in
+            ReminderRouteSheet(route: route)
                 .environment(\.moneyFormatter, formatter)
         }
         .fullScreenCover(isPresented: showsOnboarding) {
