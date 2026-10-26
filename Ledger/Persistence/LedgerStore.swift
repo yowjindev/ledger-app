@@ -38,7 +38,7 @@ enum LedgerStore {
     /// Creates a container for the current schema, running any registered migrations.
     /// Local only: CloudKit is explicitly disabled so no data leaves the device.
     static func makeContainer(storage: Storage) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: LedgerSchemaV4.self)
+        let schema = Schema(versionedSchema: LedgerSchemaV5.self)
         let configuration: ModelConfiguration
         switch storage {
         case .onDisk(let url):
