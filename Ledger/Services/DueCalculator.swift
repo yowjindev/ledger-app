@@ -16,6 +16,9 @@ struct PlanSnapshot: Hashable, Sendable {
     let paidAtStart: Int
     /// Due date of the first payment still to make.
     let firstDue: CalendarDay
+    /// Fees stored on the plan, for one added without entries. A split logged in Ledger keeps its
+    /// fees in an entry instead, so this is zero for it.
+    var feesMinor: Int64 = 0
 
     /// The payments still to make, one per cycle from `firstDue`'s month; the final one is
     /// `lastMinor`.
@@ -34,6 +37,16 @@ struct DueOverrideSnapshot: Hashable, Sendable {
     let cycle: CalendarMonth
     let movedTo: CalendarDay?
     let amountMinor: Int64?
+}
+
+/// An owed account's limit, what's left of it, and the unpaid fees left out of what counts
+/// against it.
+struct LimitStatus: Hashable, Sendable {
+    let limit: Money
+    /// `nil` while the balance is unknown.
+    let available: Money?
+    /// Unpaid split fees taken off what counts against the limit; zero when none are.
+    let feesOffLimit: Money
 }
 
 /// What a due belongs to.
@@ -159,6 +172,56 @@ enum DueCalculator {
     static func availableCredit(limitMinor: Int64?, balance: AccountBalance) -> Money? {
         guard let limitMinor, let owed = balance.owed else { return nil }
         return Money(minorUnits: limitMinor, currency: owed.currency) - owed
+    }
+
+    /// The limit and what's left of it: the limit less what's owed. On a pay later account whose
+    /// fees don't use the limit, its plans' unpaid fees are left out of what's owed, never taking
+    /// it below zero. `nil` without a limit.
+    static func limitStatus(
+        limitMinor: Int64?,
+        balance: AccountBalance,
+        input: OwedDueInput?,
+        feesUseLimit: Bool,
+        today: CalendarDay,
+        calendar: Calendar
+    ) -> LimitStatus? {
+        guard let limitMinor else { return nil }
+        let currency = balance.account.currency
+        let limit = Money(minorUnits: limitMinor, currency: currency)
+        guard let owed = balance.owed else {
+            return LimitStatus(limit: limit, available: nil, feesOffLimit: .zero(currency))
+        }
+        var unpaidMinor: Int64 = 0
+        if balance.account.kind == .payLater, !feesUseLimit, let input {
+            for plan in input.plans {
+                unpaidMinor += unpaidFees(
+                    feesMinor: fees(of: plan, input),
+                    months: plan.months,
+                    monthsPaid: monthsPaid(plan, input, today: today, calendar: calendar)
+                )
+            }
+        }
+        let feesOff = min(Money(minorUnits: unpaidMinor, currency: currency).amount, max(owed.amount, .zero))
+        return LimitStatus(
+            limit: limit,
+            available: limit - Money(owed.amount - feesOff, currency: currency),
+            feesOffLimit: Money(feesOff, currency: currency)
+        )
+    }
+
+    /// A plan's fees: its fees entry, if it has one, plus the fees stored on it.
+    static func fees(of plan: PlanSnapshot, _ input: OwedDueInput) -> Int64 {
+        input.movements
+            .filter { $0.planID == plan.id && $0.origin == .planFees }
+            .reduce(plan.feesMinor) { $0 + $1.amountMinor }
+    }
+
+    /// The part of a plan's fees not yet paid after `monthsPaid` of its `months`. The paid share
+    /// is rounded down, so it reaches zero only on the last payment.
+    static func unpaidFees(feesMinor: Int64, months: Int, monthsPaid: Int) -> Int64 {
+        guard months > 0 else { return 0 }
+        let paid = Int64(min(max(monthsPaid, 0), months))
+        return feesMinor - feesMinor * paid / Int64(months)
     }
 
     // MARK: Helpers
