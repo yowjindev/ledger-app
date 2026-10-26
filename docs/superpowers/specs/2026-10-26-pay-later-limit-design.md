@@ -77,8 +77,9 @@ later account with the switch on, keeps limit used = owed):
 
 - **Unpaid fees of a plan** = its fees − its fees × months paid ÷ months, in centavos, with the
   paid part rounded down. That's all of the fees before any payment and zero once every
-  payment is made. Months paid is `DueCalculator.monthsPaid`, which already counts payments
-  made before the plan was added.
+  payment is made. Months paid counts payments made before the plan was added and payments made
+  ahead of their dues (`DueCalculator.monthsPaidAhead`), so paying early never leaves fees
+  counted as unpaid after they've left what's owed.
 - **Limit used** = owed − the plans' unpaid fees, but the fees taken off never exceed what's
   owed, so limit used never drops below zero because of fees. When owed is zero or less (a
   credit), nothing is taken off.

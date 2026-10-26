@@ -157,7 +157,28 @@ enum DueCalculator {
     /// payment is never counted for two plans.
     static func monthsPaid(_ plan: PlanSnapshot, _ input: OwedDueInput, today: CalendarDay, calendar: Calendar) -> Int {
         let eligible = firstEligibleCycle(input, calendar: calendar)
-        var cycle = upcomingCycle(input, today: today, eligible: eligible)
+        return monthsPaid(plan, input, searchingBackFrom: upcomingCycle(input, today: today, eligible: eligible), eligible: eligible, calendar: calendar)
+    }
+
+    /// Months of `plan` paid, including payments made ahead of their dues: the search starts at the
+    /// plan's last payment rather than the upcoming due, so a later due already covered counts.
+    static func monthsPaidAhead(_ plan: PlanSnapshot, _ input: OwedDueInput, today: CalendarDay, calendar: Calendar) -> Int {
+        let eligible = firstEligibleCycle(input, calendar: calendar)
+        let upcoming = upcomingCycle(input, today: today, eligible: eligible)
+        let start = max(upcoming, plan.slices.last?.cycle ?? upcoming)
+        return monthsPaid(plan, input, searchingBackFrom: start, eligible: eligible, calendar: calendar)
+    }
+
+    /// Months of `plan` paid before it was added, plus its payments due on or before the latest
+    /// fully paid due at or before `start`.
+    private static func monthsPaid(
+        _ plan: PlanSnapshot,
+        _ input: OwedDueInput,
+        searchingBackFrom start: CalendarMonth,
+        eligible: CalendarMonth,
+        calendar: Calendar
+    ) -> Int {
+        var cycle = start
         while cycle >= eligible {
             if left(in: cycle, input, calendar: calendar)?.isZero == true {
                 let covered = plan.slices.filter { $0.cycle <= cycle }.count
@@ -191,7 +212,7 @@ enum DueCalculator {
                 unpaidMinor += unpaidFees(
                     feesMinor: fees(of: plan, input),
                     months: plan.months,
-                    monthsPaid: monthsPaid(plan, input, today: today, calendar: calendar)
+                    monthsPaid: monthsPaidAhead(plan, input, today: today, calendar: calendar)
                 )
             }
         }

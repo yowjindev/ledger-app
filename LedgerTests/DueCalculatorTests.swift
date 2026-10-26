@@ -374,6 +374,19 @@ final class DueCalculatorTests: XCTestCase {
         XCTAssertEqual(status.feesOffLimit.amount, 150)
     }
 
+    func testPayingAheadCountsTheMonthsCovered() throws {
+        let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let status = try XCTUnwrap(limit(
+            input(
+                .payLater, payLater, opening: 0, started: try at(2, 1),
+                movements: try splitEntries(split) + [payment(2_100, at: try at(4, 1))], plans: [split]
+            ),
+            today: day(2026, 4, 2)
+        ))
+        XCTAssertEqual(status.available?.amount, 9_000)
+        XCTAssertEqual(status.feesOffLimit.amount, 50)
+    }
+
     func testFeesUseTheLimitKeepsLimitLessOwed() throws {
         let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
         let status = try XCTUnwrap(limit(
