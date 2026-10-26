@@ -10,12 +10,21 @@ struct OwedTerms: Equatable, Sendable {
     var creditLimit: Decimal?
     /// Cashback on purchases as a percentage, credit cards only.
     var cashbackPercent: Decimal?
+    /// Whether the service counts fees against the limit, pay later only.
+    var feesUseLimit: Bool
 
-    init(statementDay: Int?, dueDay: Int, creditLimit: Decimal? = nil, cashbackPercent: Decimal? = nil) {
+    init(
+        statementDay: Int?,
+        dueDay: Int,
+        creditLimit: Decimal? = nil,
+        cashbackPercent: Decimal? = nil,
+        feesUseLimit: Bool = false
+    ) {
         self.statementDay = statementDay
         self.dueDay = dueDay
         self.creditLimit = creditLimit
         self.cashbackPercent = cashbackPercent
+        self.feesUseLimit = feesUseLimit
     }
 }
 
@@ -87,6 +96,22 @@ extension LedgerService {
         Log.ledger.info("Updated an owed account")
     }
 
+    /// An owed account's limit and what's left of it, leaving unpaid split fees out of what's owed
+    /// on a pay later account whose fees don't use the limit. `nil` without a limit.
+    func limitStatus(of account: Account) throws -> LimitStatus? {
+        guard account.creditLimitMinor != nil else { return nil }
+        let input = try owedDueInput(for: account)
+        guard let balance = try input?.balance ?? balance(of: account) else { return nil }
+        return DueCalculator.limitStatus(
+            limitMinor: account.creditLimitMinor,
+            balance: balance,
+            input: input,
+            feesUseLimit: account.feesUseLimit,
+            today: today,
+            calendar: calendar
+        )
+    }
+
     /// The due date a "still due" amount refers to: the upcoming due whose statement has already
     /// closed. `nil` when no closed statement is waiting for payment.
     func awaitingDue(for schedule: DueSchedule) -> CalendarDay? {
@@ -102,12 +127,14 @@ extension LedgerService {
         let schedule: DueSchedule
         let creditLimitMinor: Int64?
         let cashbackRatePPM: Int64?
+        let feesUseLimit: Bool
 
         func apply(to account: Account) {
             account.statementDay = schedule.statementDay
             account.dueDay = schedule.dueDay
             account.creditLimitMinor = creditLimitMinor
             account.cashbackRatePPM = cashbackRatePPM
+            account.feesUseLimit = feesUseLimit
         }
     }
 
@@ -130,7 +157,8 @@ extension LedgerService {
         return ValidatedOwedTerms(
             schedule: DueSchedule(statementDay: statementDay, dueDay: terms.dueDay),
             creditLimitMinor: limitMinor,
-            cashbackRatePPM: cashbackPPM
+            cashbackRatePPM: cashbackPPM,
+            feesUseLimit: kind == .payLater && terms.feesUseLimit
         )
     }
 }

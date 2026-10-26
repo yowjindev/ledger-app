@@ -270,4 +270,28 @@ final class OwedAccountTests: XCTestCase {
         XCTAssertEqual(AccountKind.payLater.title, "Pay later")
         XCTAssertEqual(AccountKind.loan.title, "Loan")
     }
+
+    func testFeesUseLimitIsSavedForPayLaterOnly() throws {
+        let h = try harness()
+        let payLater = try h.ledger.createOwedAccount(
+            name: "PayLater",
+            kind: .payLater,
+            terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 10_000, feesUseLimit: true),
+            owedNow: 0,
+            stillDue: nil
+        )
+        XCTAssertTrue(payLater.feesUseLimit)
+
+        try h.ledger.updateOwedAccount(payLater, name: "PayLater", terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 10_000))
+        XCTAssertFalse(payLater.feesUseLimit)
+
+        let card = try h.ledger.createOwedAccount(
+            name: "Visa card",
+            kind: .creditCard,
+            terms: OwedTerms(statementDay: 5, dueDay: 25, feesUseLimit: true),
+            owedNow: 0,
+            stillDue: 0
+        )
+        XCTAssertFalse(card.feesUseLimit)
+    }
 }

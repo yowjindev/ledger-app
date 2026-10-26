@@ -102,7 +102,7 @@ struct LoanEditorView: View {
         guard let price, let monthly = input.monthly else {
             return "The price counts as spending in its category. What the payments cost over it is recorded as fees and interest."
         }
-        let last = input.hasDifferentLast ? (input.last ?? monthly) : monthly
+        let last = input.usesDifferentLast ? (input.last ?? monthly) : monthly
         let total = monthly * Decimal(input.months - 1) + last
         let extra = total - price
         guard extra > .zero else {

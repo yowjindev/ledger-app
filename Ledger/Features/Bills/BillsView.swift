@@ -133,10 +133,16 @@ struct BillsView: View {
     private func group(_ title: String, kind: AccountKind, sheet: BalanceSheet) -> some View {
         let balances = sheet.owedBalances.filter { $0.account.kind == kind }
         if !balances.isEmpty {
+            let movements = transactions.compactMap(Movement.init)
+            let today = CalendarDay(containing: now, calendar: calendar)
             Section(title) {
                 ForEach(balances) { balance in
                     NavigationLink(value: LedgerRoute.account(balance.id)) {
-                        OwedAccountRow(balance: balance, available: available(for: balance), detail: loanProgress(for: balance))
+                        OwedAccountRow(
+                            balance: balance,
+                            available: available(for: balance, movements: movements, today: today),
+                            detail: loanProgress(for: balance, movements: movements, today: today)
+                        )
                     }
                 }
             }
@@ -189,27 +195,32 @@ struct BillsView: View {
 
     // MARK: Helpers
 
-    private func available(for balance: AccountBalance) -> Money? {
-        let limit = accounts.first { $0.id == balance.id }?.creditLimitMinor
-        return DueCalculator.availableCredit(limitMinor: limit, balance: balance)
+    /// What's left of an account's limit, leaving out unpaid split fees where they don't use it.
+    private func available(for balance: AccountBalance, movements: [Movement], today: CalendarDay) -> Money? {
+        guard let account = accounts.first(where: { $0.id == balance.id }) else { return nil }
+        return DueCalculator.limitStatus(
+            limitMinor: account.creditLimitMinor,
+            balance: balance,
+            input: dueInput(for: account, balance: balance, movements: movements),
+            feesUseLimit: account.feesUseLimit,
+            today: today,
+            calendar: calendar
+        )?.available
+    }
+
+    private func dueInput(for account: Account, balance: AccountBalance, movements: [Movement]) -> OwedDueInput? {
+        LedgerService.owedDueInput(for: account, balance: balance, movements: movements, plans: plans, overrides: overrides)
     }
 
     /// A loan's progress, such as "6 of 12 paid", from its first plan.
-    private func loanProgress(for balance: AccountBalance) -> String? {
+    private func loanProgress(for balance: AccountBalance, movements: [Movement], today: CalendarDay) -> String? {
         guard
             balance.account.kind == .loan,
             let account = accounts.first(where: { $0.id == balance.id }),
             let plan = plans.filter({ $0.account?.id == balance.id }).min(by: { $0.createdAt < $1.createdAt }),
             let snapshot = PlanSnapshot(plan),
-            let input = LedgerService.owedDueInput(
-                for: account,
-                balance: balance,
-                movements: transactions.compactMap(Movement.init),
-                plans: plans,
-                overrides: overrides
-            )
+            let input = dueInput(for: account, balance: balance, movements: movements)
         else { return nil }
-        let today = CalendarDay(containing: now, calendar: calendar)
         return PlanCopy.progress(paid: DueCalculator.monthsPaid(snapshot, input, today: today, calendar: calendar), months: plan.months)
     }
 

@@ -53,7 +53,14 @@ final class DueCalculatorTests: XCTestCase {
         )
     }
 
-    private func plan(monthly: Decimal, last: Decimal? = nil, months: Int, paidAtStart: Int = 0, firstDue: CalendarDay) -> PlanSnapshot {
+    private func plan(
+        monthly: Decimal,
+        last: Decimal? = nil,
+        months: Int,
+        paidAtStart: Int = 0,
+        firstDue: CalendarDay,
+        feesMinor fees: Decimal = 0
+    ) -> PlanSnapshot {
         PlanSnapshot(
             id: UUID(),
             accountID: accountID,
@@ -61,7 +68,8 @@ final class DueCalculatorTests: XCTestCase {
             lastMinor: minor(last ?? monthly),
             months: months,
             paidAtStart: paidAtStart,
-            firstDue: firstDue
+            firstDue: firstDue,
+            feesMinor: minor(fees)
         )
     }
 
@@ -285,21 +293,166 @@ final class DueCalculatorTests: XCTestCase {
         XCTAssertEqual(partway.slices.last?.cycle, month(2026, 9))
     }
 
-    // MARK: Limits and unknowns
-
-    func testAvailableCredit() {
-        let snapshot = AccountSnapshot(
-            id: accountID, name: "Visa", kind: .creditCard, currency: .php,
-            openingBalanceMinor: -250_000, isArchived: false, sortOrder: 0
-        )
-        let balance = BalanceCalculator.balances(accounts: [snapshot], movements: [])[0]
-        XCTAssertEqual(DueCalculator.availableCredit(limitMinor: 1_000_000, balance: balance)?.amount, 7_500)
-        XCTAssertNil(DueCalculator.availableCredit(limitMinor: nil, balance: balance))
-    }
+    // MARK: Unknowns
 
     func testUnsetOpeningHasNoAmount() throws {
         let unknown = input(.creditCard, card, opening: nil, started: try at(2, 1))
         XCTAssertNil(left(month(2026, 3), unknown))
         XCTAssertNil(DueCalculator.status(unknown, today: day(2026, 3, 15), calendar: calendar).left)
+    }
+
+    // MARK: Limits
+
+    private func limit(_ input: OwedDueInput, feesUseLimit: Bool = false, today: CalendarDay) -> LimitStatus? {
+        DueCalculator.limitStatus(
+            limitMinor: minor(10_000), balance: input.balance, input: input,
+            feesUseLimit: feesUseLimit, today: today, calendar: calendar
+        )
+    }
+
+    /// A ₱3,000 purchase split into 3 payments of ₱1,050, with ₱150 of fees.
+    private func splitEntries(_ split: PlanSnapshot) throws -> [Movement] {
+        [
+            expense(3_000, at: try at(3, 10), planID: split.id),
+            expense(150, at: try at(3, 10), planID: split.id, origin: .planFees),
+        ]
+    }
+
+    func testUnpaidFeesShareRoundsThePaidPartDown() {
+        XCTAssertEqual((0...3).map { DueCalculator.unpaidFees(feesMinor: 10_000, months: 3, monthsPaid: $0) }, [10_000, 6_667, 3_334, 0])
+        XCTAssertEqual(DueCalculator.unpaidFees(feesMinor: 5_000, months: 1, monthsPaid: 0), 5_000)
+        XCTAssertEqual(DueCalculator.unpaidFees(feesMinor: 5_000, months: 1, monthsPaid: 1), 0)
+        XCTAssertEqual(DueCalculator.unpaidFees(feesMinor: 5_000, months: 1, monthsPaid: 2), 0)
+    }
+
+    func testLimitStatusLeavesUnpaidSplitFeesOut() throws {
+        let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let entries = try splitEntries(split)
+
+        let unpaid = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: 0, started: try at(2, 1), movements: entries, plans: [split]),
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(unpaid.limit.amount, 10_000)
+        XCTAssertEqual(unpaid.available?.amount, 7_000)
+        XCTAssertEqual(unpaid.feesOffLimit.amount, 150)
+
+        let onePaid = try XCTUnwrap(limit(
+            input(
+                .payLater, payLater, opening: 0, started: try at(2, 1),
+                movements: entries + [payment(1_050, at: try at(4, 1))], plans: [split]
+            ),
+            today: day(2026, 4, 2)
+        ))
+        XCTAssertEqual(onePaid.available?.amount, 8_000)
+        XCTAssertEqual(onePaid.feesOffLimit.amount, 100)
+
+        let allPaid = try XCTUnwrap(limit(
+            input(
+                .payLater, payLater, opening: 0, started: try at(2, 1),
+                movements: entries + [
+                    payment(1_050, at: try at(4, 1)), payment(1_050, at: try at(5, 1)), payment(1_050, at: try at(6, 1)),
+                ],
+                plans: [split]
+            ),
+            today: day(2026, 6, 2)
+        ))
+        XCTAssertEqual(allPaid.available?.amount, 10_000)
+        XCTAssertEqual(allPaid.feesOffLimit.amount, 0)
+    }
+
+    func testPartPaymentKeepsFeesOffUntilTheDueIsPaid() throws {
+        let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let status = try XCTUnwrap(limit(
+            input(
+                .payLater, payLater, opening: 0, started: try at(2, 1),
+                movements: try splitEntries(split) + [payment(500, at: try at(4, 1))], plans: [split]
+            ),
+            today: day(2026, 4, 2)
+        ))
+        XCTAssertEqual(status.available?.amount, 7_500)
+        XCTAssertEqual(status.feesOffLimit.amount, 150)
+    }
+
+    func testPayingAheadCountsTheMonthsCovered() throws {
+        let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let status = try XCTUnwrap(limit(
+            input(
+                .payLater, payLater, opening: 0, started: try at(2, 1),
+                movements: try splitEntries(split) + [payment(2_100, at: try at(4, 1))], plans: [split]
+            ),
+            today: day(2026, 4, 2)
+        ))
+        XCTAssertEqual(status.available?.amount, 9_000)
+        XCTAssertEqual(status.feesOffLimit.amount, 50)
+    }
+
+    func testFeesUseTheLimitKeepsLimitLessOwed() throws {
+        let split = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let status = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: 0, started: try at(2, 1), movements: try splitEntries(split), plans: [split]),
+            feesUseLimit: true,
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(status.available?.amount, 6_850)
+        XCTAssertEqual(status.feesOffLimit.amount, 0)
+    }
+
+    func testTwoSplitsAddTheirUnpaidFees() throws {
+        let first = plan(monthly: 1_050, months: 3, firstDue: day(2026, 4, 5))
+        let second = plan(monthly: 530, months: 2, firstDue: day(2026, 4, 5))
+        let entries = try splitEntries(first) + [
+            expense(1_000, at: try at(3, 12), planID: second.id),
+            expense(60, at: try at(3, 12), planID: second.id, origin: .planFees),
+        ]
+        let status = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: 0, started: try at(2, 1), movements: entries, plans: [first, second]),
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(status.feesOffLimit.amount, 210)
+        XCTAssertEqual(status.available?.amount, 6_000)
+    }
+
+    func testStoredFeesOfAPlanUnderWay() throws {
+        let underWay = plan(monthly: 500, months: 6, paidAtStart: 3, firstDue: day(2026, 4, 5), feesMinor: 300)
+        let status = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: -1_500, started: try at(2, 1), plans: [underWay]),
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(status.feesOffLimit.amount, 150)
+        XCTAssertEqual(status.available?.amount, 8_650)
+    }
+
+    func testFeesTakenOffNeverExceedWhatsOwed() throws {
+        let underWay = plan(monthly: 500, months: 3, firstDue: day(2026, 4, 5), feesMinor: 300)
+        let lowered = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: -100, started: try at(2, 1), plans: [underWay]),
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(lowered.available?.amount, 10_000)
+        XCTAssertEqual(lowered.feesOffLimit.amount, 100)
+
+        let credit = try XCTUnwrap(limit(
+            input(.payLater, payLater, opening: 50, started: try at(2, 1), plans: [underWay]),
+            today: day(2026, 3, 20)
+        ))
+        XCTAssertEqual(credit.available?.amount, 10_050)
+        XCTAssertEqual(credit.feesOffLimit.amount, 0)
+    }
+
+    func testCardLimitStatusIsLimitLessOwed() throws {
+        let fees = plan(monthly: 500, months: 3, firstDue: day(2026, 4, 25), feesMinor: 300)
+        let owing = input(.creditCard, card, opening: -2_500, started: try at(2, 1), plans: [fees])
+        let status = try XCTUnwrap(limit(owing, today: day(2026, 3, 20)))
+        XCTAssertEqual(status.available?.amount, 7_500)
+        XCTAssertEqual(status.feesOffLimit.amount, 0)
+        XCTAssertNil(DueCalculator.limitStatus(
+            limitMinor: nil, balance: owing.balance, input: owing, feesUseLimit: false, today: day(2026, 3, 20), calendar: calendar
+        ))
+
+        let unknown = try XCTUnwrap(limit(input(.creditCard, card, opening: nil, started: try at(2, 1)), today: day(2026, 3, 20)))
+        XCTAssertEqual(unknown.limit.amount, 10_000)
+        XCTAssertNil(unknown.available)
+        XCTAssertEqual(unknown.feesOffLimit.amount, 0)
     }
 }

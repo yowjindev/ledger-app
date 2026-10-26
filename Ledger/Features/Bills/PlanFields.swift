@@ -9,11 +9,16 @@ struct PlanPaymentsInput: Equatable {
     var last: Decimal?
     var months = 12
     var paidAtStart = 0
+    /// The item's price, for a split already under way.
+    var price: Decimal?
+
+    /// Whether the last payment differs from the others. A single payment has no last one.
+    var usesDifferentLast: Bool { hasDifferentLast && months > 1 }
 
     var isComplete: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && monthly != nil
-            && (!hasDifferentLast || last != nil)
+            && (!usesDifferentLast || last != nil)
     }
 
     func terms(nextDue: CalendarDay) -> PlanTerms? {
@@ -21,10 +26,11 @@ struct PlanPaymentsInput: Equatable {
         return PlanTerms(
             title: title,
             monthly: monthly,
-            last: hasDifferentLast ? last : nil,
+            last: usesDifferentLast ? last : nil,
             months: months,
             paidAtStart: paidAtStart,
-            nextDue: nextDue
+            nextDue: nextDue,
+            price: price
         )
     }
 }
@@ -38,8 +44,10 @@ struct PlanPaymentRows: View {
 
     var body: some View {
         AmountField("Each Payment", amount: $input.monthly, accessibilityLabel: "Each monthly payment")
-        Toggle("Last Payment Is Different", isOn: $input.hasDifferentLast.animation())
-        if input.hasDifferentLast {
+        if input.months > 1 {
+            Toggle("Last Payment Is Different", isOn: $input.hasDifferentLast.animation())
+        }
+        if input.usesDifferentLast {
             AmountField("Last Payment", amount: $input.last, accessibilityLabel: "Last payment")
         }
         Stepper(value: $input.months, in: months) {

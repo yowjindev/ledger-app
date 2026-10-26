@@ -48,4 +48,11 @@ final class DueStatusCopyTests: XCTestCase {
         XCTAssertEqual(text(status(left: 1, due: day(3, 12), overdue: true)), "3 days overdue")
         XCTAssertEqual(text(status(left: 1, due: day(2, 25), overdue: true)), "18 days overdue")
     }
+
+    func testFeesOffLimitFooter() {
+        XCTAssertEqual(
+            plainSpaces(BillsCopy.feesOffLimitFooter(Money(dec("150")), formatter: formatter)),
+            "₱150.00 of what you owe is fees, which don't use your limit."
+        )
+    }
 }

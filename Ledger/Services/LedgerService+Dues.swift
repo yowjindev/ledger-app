@@ -127,7 +127,8 @@ extension PlanSnapshot {
             lastMinor: plan.lastMinor,
             months: plan.months,
             paidAtStart: plan.paidAtStart,
-            firstDue: firstDue
+            firstDue: firstDue,
+            feesMinor: plan.feesMinor ?? 0
         )
     }
 }

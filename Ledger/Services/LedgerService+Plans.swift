@@ -27,6 +27,9 @@ struct PlanTerms: Equatable, Sendable {
     var paidAtStart: Int
     /// Due date of the next payment to make.
     var nextDue: CalendarDay
+    /// The item's price, for a split already under way. The payments' total less this is the
+    /// plan's fees.
+    var price: Decimal?
 }
 
 /// The item a new loan paid for.
@@ -38,7 +41,7 @@ struct LoanPurchase: Equatable, Sendable {
 
 extension LedgerService {
     /// Months a pay later purchase can be split into.
-    static let splitMonths = 2...60
+    static let splitMonths = 1...60
     /// Months a loan can run for.
     static let loanMonths = 1...60
 
@@ -95,7 +98,8 @@ extension LedgerService {
 
     /// Adds payments that are already under way: a split on a pay later account, or a loan's
     /// payments in place of a plan that was deleted. The purchase happened before Ledger, and what
-    /// the account owes already includes it, so no entries are recorded.
+    /// the account owes already includes it, so no entries are recorded. With the item's price,
+    /// the plan stores its fees.
     @discardableResult
     func addExistingPlan(_ terms: PlanTerms, to account: Account) throws -> PaymentPlan {
         guard account.modelContext != nil, !account.isDeleted else { throw LedgerError.accountNotFound }
@@ -108,7 +112,15 @@ extension LedgerService {
         guard schedule.dueDate(in: CalendarMonth(containing: terms.nextDue)) == terms.nextDue else {
             throw LedgerError.dueDateNotOnSchedule
         }
+        var feesMinor: Int64?
+        if let price = terms.price {
+            let priceMinor = try AmountRules.transactionMinorUnits(price, currency: account.currency)
+            let fees = validated.amounts.totalMinor - priceMinor
+            guard fees >= 0 else { throw LedgerError.planTotalBelowPrice }
+            feesMinor = fees
+        }
         let plan = makePlan(validated, terms: terms, account: account)
+        plan.feesMinor = feesMinor
         context.insert(plan)
         try commit()
         Log.ledger.info("Added a payment plan")
