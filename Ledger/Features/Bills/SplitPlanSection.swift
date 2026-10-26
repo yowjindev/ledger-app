@@ -8,9 +8,12 @@ struct SplitPlanInput: Equatable {
     var hasDifferentLast = false
     var last: Decimal?
 
+    /// Whether the last payment differs from the others. A single payment has no last one.
+    var usesDifferentLast: Bool { hasDifferentLast && months > 1 }
+
     /// Ready to record: split, with the amounts the payments need.
     var isComplete: Bool {
-        !isOn || (monthly != nil && (!hasDifferentLast || last != nil))
+        !isOn || (monthly != nil && (!usesDifferentLast || last != nil))
     }
 
     func purchase(from draft: TransactionDraft) -> SplitPurchase? {
@@ -23,7 +26,7 @@ struct SplitPlanInput: Equatable {
             note: draft.note,
             months: months,
             monthly: monthly,
-            last: hasDifferentLast ? last : nil
+            last: usesDifferentLast ? last : nil
         )
     }
 }
@@ -45,8 +48,10 @@ struct SplitPlanSection: View {
                     LabeledContent("Months", value: "\(input.months)")
                 }
                 AmountField("Each Payment", amount: $input.monthly, accessibilityLabel: "Each monthly payment")
-                Toggle("Last Payment Is Different", isOn: $input.hasDifferentLast.animation())
-                if input.hasDifferentLast {
+                if input.months > 1 {
+                    Toggle("Last Payment Is Different", isOn: $input.hasDifferentLast.animation())
+                }
+                if input.usesDifferentLast {
                     AmountField("Last Payment", amount: $input.last, accessibilityLabel: "Last payment")
                 }
             }
@@ -56,19 +61,11 @@ struct SplitPlanSection: View {
     }
 
     private var footer: String {
-        guard input.isOn else { return "Pay in 3, 6, or more months? Split it to track each payment on its due date." }
+        guard input.isOn else { return "Paying next month or in 3, 6, or more months? Split it to track each payment on its due date." }
         guard let price, let monthly = input.monthly else {
             return "Enter each payment as your pay later app shows it. The first one is due on this account's next due date."
         }
-        let last = input.hasDifferentLast ? (input.last ?? monthly) : monthly
-        let total = monthly * Decimal(input.months - 1) + last
-        let extra = total - price
-        if extra.isZero {
-            return "The payments add up to the price, so there are no fees."
-        }
-        if extra < .zero {
-            return "The payments add up to less than the price. Check the amount of each payment."
-        }
-        return "You'll pay \(formatter.string(Money(total))) in all: \(formatter.string(Money(extra))) more than the price, recorded as fees and interest."
+        let last = input.usesDifferentLast ? (input.last ?? monthly) : monthly
+        return PlanCopy.splitSummary(price: price, months: input.months, monthly: monthly, last: last, formatter: formatter)
     }
 }

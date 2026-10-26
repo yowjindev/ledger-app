@@ -41,7 +41,7 @@ struct LoanPurchase: Equatable, Sendable {
 
 extension LedgerService {
     /// Months a pay later purchase can be split into.
-    static let splitMonths = 2...60
+    static let splitMonths = 1...60
     /// Months a loan can run for.
     static let loanMonths = 1...60
 

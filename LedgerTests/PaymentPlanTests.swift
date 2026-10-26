@@ -120,10 +120,25 @@ final class PaymentPlanTests: XCTestCase {
         assertThrowsLedgerError(.splitNotOffered) {
             try h.ledger.recordSplitPurchase(split(3_000, on: card, category: shopping, months: 3, monthly: 1_050, at: h.clock.now))
         }
-        assertThrowsLedgerError(.planMonthsOutOfRange(range: 2...60)) {
-            try h.ledger.recordSplitPurchase(split(3_000, on: account, category: shopping, months: 1, monthly: 3_000, at: h.clock.now))
+        assertThrowsLedgerError(.planMonthsOutOfRange(range: 1...60)) {
+            try h.ledger.recordSplitPurchase(split(3_000, on: account, category: shopping, months: 0, monthly: 3_000, at: h.clock.now))
         }
         XCTAssertEqual(try h.transactionCount(), 0)
+    }
+
+    func testOneMonthSplitIsDueOnTheStatementsDueDate() throws {
+        let h = try harness()
+        let account = try payLater(h)
+        let shopping = try h.expenseCategory("Shopping")
+
+        let plan = try h.ledger.recordSplitPurchase(split(1_000, on: account, category: shopping, months: 1, monthly: 1_050, at: h.clock.now))
+
+        XCTAssertEqual(plan.months, 1)
+        XCTAssertEqual(plan.firstDueDay, day(2026, 4, 5))
+        XCTAssertEqual(PlanSnapshot(plan)?.slices.count, 1)
+        let fees = try XCTUnwrap(try h.ledger.transactions().first { $0.origin == .planFees })
+        XCTAssertEqual(fees.amountMinor, 5_000)
+        XCTAssertEqual(try h.ledger.balance(of: account)?.owed?.amount, 1_050)
     }
 
     func testExistingPlanCreatesNoEntries() throws {
