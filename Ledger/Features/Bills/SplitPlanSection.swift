@@ -146,6 +146,9 @@ struct SplitPlanSection: View {
     private var footer: String {
         guard input.isOn else { return "Paying next month or in 3, 6, or more months? Split it to track each payment on its due date." }
         guard let price, let monthly = input.monthly else {
+            if !input.feeText.isEmpty {
+                return "Enter the price above and each payment fills in from the monthly fee. Check it against your pay later app and change it if it differs. Payments start on this account's next due date."
+            }
             return "Enter the monthly fee to fill in each payment, or type the payment as your pay later app shows it. Payments start on this account's next due date."
         }
         let last = input.usesDifferentLast ? (input.last ?? monthly) : monthly
