@@ -31,6 +31,10 @@ extension Account {
     var cashbackRate: Rate? {
         cashbackRatePPM.map(Rate.init(partsPerMillion:))
     }
+
+    var splitFeeRate: Rate? {
+        splitFeeRatePPM.map(Rate.init(partsPerMillion:))
+    }
 }
 
 extension PaymentPlan {

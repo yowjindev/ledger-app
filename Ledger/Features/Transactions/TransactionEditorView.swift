@@ -125,7 +125,11 @@ struct TransactionEditorView: View {
             accountSection
 
             if canSplit {
-                SplitPlanSection(input: $split, price: form.amount)
+                SplitPlanSection(
+                    input: $split,
+                    price: form.amount,
+                    defaultFeeRate: accounts.first { $0.id == form.accountID }?.splitFeeRate
+                )
             }
 
             Section {

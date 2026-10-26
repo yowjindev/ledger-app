@@ -46,6 +46,13 @@ enum RateRules {
         return try rate(percent: percent)
     }
 
+    /// A pay later service's monthly fee on splits, as a share of the price: above 0% and at most
+    /// 100%.
+    static func splitFeeRate(percent: Decimal) throws -> Rate {
+        guard !percent.isNaN, percent > .zero, percent <= 100 else { throw LedgerError.splitFeeRateOutOfRange }
+        return try rate(percent: percent)
+    }
+
     private static func rate(percent: Decimal) throws -> Rate {
         guard percent.hasAtMostFractionDigits(maximumFractionDigits) else { throw LedgerError.rateTooPrecise }
         return Rate(partsPerMillion: NSDecimalNumber(decimal: percent * 10_000).int64Value)

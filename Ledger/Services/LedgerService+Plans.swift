@@ -45,6 +45,19 @@ extension LedgerService {
     /// Months a loan can run for.
     static let loanMonths = 1...60
 
+    /// A split's monthly payment from the price and the service's monthly fee: the price split
+    /// evenly plus the fee's share of the price, each rounded to the centavo with halves up.
+    nonisolated static func splitPayment(price: Decimal, months: Int, feeRate: Rate, currency: CurrencyCode = .php) -> Decimal {
+        guard months > 0 else { return .zero }
+        func rounded(_ value: Decimal) -> Decimal {
+            var value = value
+            var result = Decimal()
+            NSDecimalRound(&result, &value, currency.minorUnitDigits, .plain)
+            return result
+        }
+        return rounded(price / Decimal(months)) + rounded(price * feeRate.fraction)
+    }
+
     // MARK: Recording
 
     /// Records a split pay later purchase in one save: the price as an expense in its category,

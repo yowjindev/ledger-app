@@ -325,26 +325,3 @@ enum LedgerSchemaV4: VersionedSchema {
         }
     }
 }
-
-/// Migration plan for the persisted schema. New versions append a schema and a stage here;
-/// existing financial records must always be carried forward, never dropped.
-enum LedgerMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] {
-        [LedgerSchemaV1.self, LedgerSchemaV2.self, LedgerSchemaV3.self, LedgerSchemaV4.self]
-    }
-
-    static var stages: [MigrationStage] {
-        [
-            .lightweight(fromVersion: LedgerSchemaV1.self, toVersion: LedgerSchemaV2.self),
-            .lightweight(fromVersion: LedgerSchemaV2.self, toVersion: LedgerSchemaV3.self),
-            .lightweight(fromVersion: LedgerSchemaV3.self, toVersion: LedgerSchemaV4.self),
-        ]
-    }
-}
-
-typealias Account = LedgerSchemaV4.Account
-typealias LedgerCategory = LedgerSchemaV4.LedgerCategory
-typealias LedgerTransaction = LedgerSchemaV4.LedgerTransaction
-typealias PaymentPlan = LedgerSchemaV4.PaymentPlan
-typealias Bill = LedgerSchemaV4.Bill
-typealias DueOverride = LedgerSchemaV4.DueOverride

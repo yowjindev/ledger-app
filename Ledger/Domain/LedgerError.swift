@@ -36,6 +36,7 @@ enum LedgerError: Error, Equatable, Sendable {
     case statementDayRequired
     case cashbackNotOffered
     case cashbackRateOutOfRange
+    case splitFeeRateOutOfRange
     case stillDueNotApplicable
     case stillDueAboveOwed
     case stillDueRequired
@@ -122,6 +123,8 @@ extension LedgerError: LocalizedError {
             "Only credit cards can have cashback."
         case .cashbackRateOutOfRange:
             "Enter a cashback rate above 0% and up to 100%."
+        case .splitFeeRateOutOfRange:
+            "Enter a monthly fee above 0% and up to 100%."
         case .stillDueNotApplicable:
             "No bill is waiting for payment right now. Leave this empty."
         case .stillDueAboveOwed:

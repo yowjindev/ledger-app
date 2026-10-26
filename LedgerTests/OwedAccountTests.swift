@@ -294,4 +294,45 @@ final class OwedAccountTests: XCTestCase {
         )
         XCTAssertFalse(card.feesUseLimit)
     }
+
+    func testSplitFeeRateIsSavedForPayLaterOnly() throws {
+        let h = try harness()
+        let payLater = try h.ledger.createOwedAccount(
+            name: "PayLater",
+            kind: .payLater,
+            terms: OwedTerms(statementDay: 31, dueDay: 5, splitFeePercent: 5),
+            owedNow: 0,
+            stillDue: nil
+        )
+        XCTAssertEqual(payLater.splitFeeRatePPM, 50_000)
+        XCTAssertEqual(payLater.splitFeeRate?.percent, 5)
+
+        try h.ledger.updateOwedAccount(payLater, name: "PayLater", terms: OwedTerms(statementDay: 31, dueDay: 5))
+        XCTAssertNil(payLater.splitFeeRatePPM)
+
+        let card = try h.ledger.createOwedAccount(
+            name: "Visa card",
+            kind: .creditCard,
+            terms: OwedTerms(statementDay: 5, dueDay: 25, splitFeePercent: 5),
+            owedNow: 0,
+            stillDue: 0
+        )
+        XCTAssertNil(card.splitFeeRatePPM)
+    }
+
+    func testSplitFeeRateMustBeAboveZeroAndAtMostAHundred() throws {
+        let h = try harness()
+        for percent in [Decimal(0), 150] {
+            assertThrowsLedgerError(.splitFeeRateOutOfRange) {
+                try h.ledger.createOwedAccount(
+                    name: "PayLater",
+                    kind: .payLater,
+                    terms: OwedTerms(statementDay: 31, dueDay: 5, splitFeePercent: percent),
+                    owedNow: 0,
+                    stillDue: nil
+                )
+            }
+        }
+        XCTAssertEqual(LedgerError.splitFeeRateOutOfRange.errorDescription, "Enter a monthly fee above 0% and up to 100%.")
+    }
 }
