@@ -10,12 +10,21 @@ struct OwedTerms: Equatable, Sendable {
     var creditLimit: Decimal?
     /// Cashback on purchases as a percentage, credit cards only.
     var cashbackPercent: Decimal?
+    /// Whether the service counts fees against the limit, pay later only.
+    var feesUseLimit: Bool
 
-    init(statementDay: Int?, dueDay: Int, creditLimit: Decimal? = nil, cashbackPercent: Decimal? = nil) {
+    init(
+        statementDay: Int?,
+        dueDay: Int,
+        creditLimit: Decimal? = nil,
+        cashbackPercent: Decimal? = nil,
+        feesUseLimit: Bool = false
+    ) {
         self.statementDay = statementDay
         self.dueDay = dueDay
         self.creditLimit = creditLimit
         self.cashbackPercent = cashbackPercent
+        self.feesUseLimit = feesUseLimit
     }
 }
 
@@ -102,12 +111,14 @@ extension LedgerService {
         let schedule: DueSchedule
         let creditLimitMinor: Int64?
         let cashbackRatePPM: Int64?
+        let feesUseLimit: Bool
 
         func apply(to account: Account) {
             account.statementDay = schedule.statementDay
             account.dueDay = schedule.dueDay
             account.creditLimitMinor = creditLimitMinor
             account.cashbackRatePPM = cashbackRatePPM
+            account.feesUseLimit = feesUseLimit
         }
     }
 
@@ -130,7 +141,8 @@ extension LedgerService {
         return ValidatedOwedTerms(
             schedule: DueSchedule(statementDay: statementDay, dueDay: terms.dueDay),
             creditLimitMinor: limitMinor,
-            cashbackRatePPM: cashbackPPM
+            cashbackRatePPM: cashbackPPM,
+            feesUseLimit: kind == .payLater && terms.feesUseLimit
         )
     }
 }

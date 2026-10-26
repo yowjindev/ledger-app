@@ -25,6 +25,7 @@ struct OwedAccountEditorView: View {
     @State private var dueDay: Int
     @State private var limit: Decimal?
     @State private var cashbackText: String
+    @State private var feesUseLimit: Bool
     @State private var owedNow: Decimal?
     @State private var stillDue: Decimal?
     @State private var isSaving = false
@@ -41,6 +42,7 @@ struct OwedAccountEditorView: View {
         var dueDay: Int
         var limit: Decimal?
         var cashbackText: String
+        var feesUseLimit: Bool
         var owedNow: Decimal?
         var stillDue: Decimal?
     }
@@ -58,6 +60,7 @@ struct OwedAccountEditorView: View {
             dueDay: account?.dueDay ?? (kind == .payLater ? 5 : 25),
             limit: account?.creditLimit?.amount,
             cashbackText: account?.cashbackRate?.editableText() ?? "",
+            feesUseLimit: account?.feesUseLimit ?? false,
             owedNow: nil,
             stillDue: nil
         )
@@ -67,6 +70,7 @@ struct OwedAccountEditorView: View {
         _dueDay = State(initialValue: snapshot.dueDay)
         _limit = State(initialValue: snapshot.limit)
         _cashbackText = State(initialValue: snapshot.cashbackText)
+        _feesUseLimit = State(initialValue: snapshot.feesUseLimit)
     }
 
     var body: some View {
@@ -97,9 +101,14 @@ struct OwedAccountEditorView: View {
                         if kind == .creditCard {
                             cashbackField
                         }
+                        if kind == .payLater {
+                            Toggle("Fees Use the Limit", isOn: $feesUseLimit)
+                        }
                     } footer: {
                         if kind == .creditCard {
                             Text("Cashback is added automatically to every purchase you log on this card, rounded down to the centavo.")
+                        } else if kind == .payLater {
+                            Text("Turn on if this service's available limit goes down by its fees or interest too.")
                         }
                     }
                 }
@@ -207,7 +216,7 @@ struct OwedAccountEditorView: View {
     private var current: Snapshot {
         Snapshot(
             name: name, statementDay: statementDay, dueDay: dueDay, limit: limit,
-            cashbackText: cashbackText, owedNow: owedNow, stillDue: stillDue
+            cashbackText: cashbackText, feesUseLimit: feesUseLimit, owedNow: owedNow, stillDue: stillDue
         )
     }
 
@@ -222,7 +231,13 @@ struct OwedAccountEditorView: View {
 
     private var terms: OwedTerms {
         let cashback = cashbackText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : Rate.parse(cashbackText, locale: locale)
-        return OwedTerms(statementDay: kind == .loan ? nil : statementDay, dueDay: dueDay, creditLimit: limit, cashbackPercent: cashback)
+        return OwedTerms(
+            statementDay: kind == .loan ? nil : statementDay,
+            dueDay: dueDay,
+            creditLimit: limit,
+            cashbackPercent: cashback,
+            feesUseLimit: feesUseLimit
+        )
     }
 
     /// Saves through the ledger and closes the sheet only after the save succeeded.
