@@ -36,6 +36,11 @@ enum BillsCopy {
 
     static let owedFooter = "What the app or statement shows as your total balance, including purchases not billed yet."
 
+    /// Unpaid split fees included in what's owed but left out of the limit.
+    static func feesOffLimitFooter(_ fees: Money, formatter: MoneyFormatter) -> String {
+        "\(formatter.string(fees)) of what you owe is fees, which don't use your limit."
+    }
+
     static let paymentFooter = "A payment is a transfer from one of your accounts, so it isn't counted as spending."
 
     /// What Update What You Owe will record.

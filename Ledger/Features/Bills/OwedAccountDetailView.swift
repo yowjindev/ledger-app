@@ -63,7 +63,7 @@ struct OwedAccountDetailView: View {
             if account.kind == .payLater || account.kind == .loan {
                 plansSection(account: account, input: input, today: today)
             }
-            limitSection(account: account, balance: balance)
+            limitSection(account: account, balance: balance, input: input, today: today)
             if let schedule = account.dueSchedule, schedule.statementDay != nil {
                 periodSection(schedule: schedule, history: history, today: today)
             }
@@ -211,12 +211,23 @@ struct OwedAccountDetailView: View {
     }
 
     @ViewBuilder
-    private func limitSection(account: Account, balance: AccountBalance) -> some View {
-        if let limit = account.creditLimit {
+    private func limitSection(account: Account, balance: AccountBalance, input: OwedDueInput?, today: CalendarDay) -> some View {
+        if let status = DueCalculator.limitStatus(
+            limitMinor: account.creditLimitMinor,
+            balance: balance,
+            input: input,
+            feesUseLimit: account.feesUseLimit,
+            today: today,
+            calendar: calendar
+        ) {
             Section {
-                LabeledContent(BillsCopy.limitTitle(for: account.kind)) { MoneyText(limit) }
-                if let available = DueCalculator.availableCredit(limitMinor: account.creditLimitMinor, balance: balance) {
+                LabeledContent(BillsCopy.limitTitle(for: account.kind)) { MoneyText(status.limit) }
+                if let available = status.available {
                     LabeledContent("Available") { MoneyText(available) }
+                }
+            } footer: {
+                if status.feesOffLimit.isPositive {
+                    Text(BillsCopy.feesOffLimitFooter(status.feesOffLimit, formatter: formatter))
                 }
             }
         }

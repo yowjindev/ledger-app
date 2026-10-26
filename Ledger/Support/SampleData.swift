@@ -69,7 +69,7 @@ enum SampleData {
     }
 
     /// A credit card with cashback and two purchases, a loan partway through, and a pay later
-    /// account. Skips any whose name is already taken.
+    /// account with a split purchase. Skips any whose name is already taken.
     private static func loadOwedAccounts(
         ledger: LedgerService,
         existing: [String: Account],
@@ -99,13 +99,19 @@ enum SampleData {
             )
         }
         if existing["PayLater"] == nil {
-            try ledger.createOwedAccount(
+            let payLater = try ledger.createOwedAccount(
                 name: "PayLater",
                 kind: .payLater,
                 terms: OwedTerms(statementDay: 31, dueDay: 5, creditLimit: 8_000),
                 owedNow: 1_500,
                 stillDue: ledger.awaitingDue(for: DueSchedule(statementDay: 31, dueDay: 5)).map { _ in 1_500 }
             )
+            if let shopping = expenses["Shopping"] {
+                try ledger.recordSplitPurchase(SplitPurchase(
+                    amount: 1_200, accountID: payLater.id, categoryID: shopping.id, occurredAt: hoursAgo(48),
+                    note: "Earbuds", months: 3, monthly: 420, last: nil
+                ))
+            }
         }
     }
 

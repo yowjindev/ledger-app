@@ -168,12 +168,6 @@ enum DueCalculator {
         return plan.paidAtStart
     }
 
-    /// The limit less what's owed, or `nil` without a limit or a known balance.
-    static func availableCredit(limitMinor: Int64?, balance: AccountBalance) -> Money? {
-        guard let limitMinor, let owed = balance.owed else { return nil }
-        return Money(minorUnits: limitMinor, currency: owed.currency) - owed
-    }
-
     /// The limit and what's left of it: the limit less what's owed. On a pay later account whose
     /// fees don't use the limit, its plans' unpaid fees are left out of what's owed, never taking
     /// it below zero. `nil` without a limit.

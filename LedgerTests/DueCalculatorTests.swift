@@ -293,17 +293,7 @@ final class DueCalculatorTests: XCTestCase {
         XCTAssertEqual(partway.slices.last?.cycle, month(2026, 9))
     }
 
-    // MARK: Limits and unknowns
-
-    func testAvailableCredit() {
-        let snapshot = AccountSnapshot(
-            id: accountID, name: "Visa", kind: .creditCard, currency: .php,
-            openingBalanceMinor: -250_000, isArchived: false, sortOrder: 0
-        )
-        let balance = BalanceCalculator.balances(accounts: [snapshot], movements: [])[0]
-        XCTAssertEqual(DueCalculator.availableCredit(limitMinor: 1_000_000, balance: balance)?.amount, 7_500)
-        XCTAssertNil(DueCalculator.availableCredit(limitMinor: nil, balance: balance))
-    }
+    // MARK: Unknowns
 
     func testUnsetOpeningHasNoAmount() throws {
         let unknown = input(.creditCard, card, opening: nil, started: try at(2, 1))
