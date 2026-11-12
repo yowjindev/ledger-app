@@ -441,6 +441,55 @@ final class IntentFlowTests: XCTestCase {
         XCTAssertTrue(body.contains("You owe ₱2,250.00 on Visa card"), body)
     }
 
+    private func logPurchase(_ h: LedgerHarness, on account: Account, category: LedgerCategory) async throws -> IntentOutcome {
+        try await IntentFlows.logExpense(
+            in: h.ledger,
+            amount: pesos("1000"),
+            category: ExpenseCategoryEntity(category),
+            account: AccountEntity(account),
+            askAmount: { _ in throw UnexpectedPrompt() },
+            askCategory: { _ in throw UnexpectedPrompt() },
+            askAccount: { _ in throw UnexpectedPrompt() },
+            confirm: { _, _ in }
+        )
+    }
+
+    func testExpenseOnAPayLaterAccountWithAFeeAddsIt() async throws {
+        let h = try LedgerHarness()
+        let payLater = try h.ledger.createOwedAccount(
+            name: "PayLater", kind: .payLater, terms: OwedTerms(statementDay: 31, dueDay: 5, splitFeePercent: 5),
+            owedNow: 0, stillDue: nil
+        )
+        let shopping = try h.expenseCategory("Shopping")
+
+        let outcome = try await logPurchase(h, on: payLater, category: shopping)
+
+        XCTAssertEqual(try h.ledger.balance(of: payLater)?.owed?.amount, 1_050)
+        let plan = try XCTUnwrap(try h.ledger.plans(for: payLater).first)
+        XCTAssertEqual(plan.months, 1)
+        let entries = try h.ledger.transactions()
+        XCTAssertEqual(entries.first { $0.origin != .planFees }?.origin, .appIntent)
+        XCTAssertEqual(entries.first { $0.origin == .planFees }?.amountMinor, 5_000)
+        XCTAssertEqual(outcome.rows.map(\.title), ["Shopping", "Fees and interest", "PayLater"])
+        let body = plainSpaces(try XCTUnwrap(outcome.body))
+        XCTAssertTrue(body.contains("₱50.00"), body)
+        XCTAssertTrue(body.contains("You owe ₱1,050.00 on PayLater"), body)
+    }
+
+    func testExpenseOnAPayLaterAccountWithoutAFeeRecordsThePrice() async throws {
+        let h = try LedgerHarness()
+        let payLater = try h.ledger.createOwedAccount(
+            name: "PayLater", kind: .payLater, terms: OwedTerms(statementDay: 31, dueDay: 5), owedNow: 0, stillDue: nil
+        )
+        let shopping = try h.expenseCategory("Shopping")
+
+        let outcome = try await logPurchase(h, on: payLater, category: shopping)
+
+        XCTAssertEqual(try h.ledger.balance(of: payLater)?.owed?.amount, 1_000)
+        XCTAssertTrue(try h.ledger.plans(for: payLater).isEmpty)
+        XCTAssertEqual(outcome.rows.map(\.title), ["Shopping", "PayLater"])
+    }
+
     func testUpdateWhatYouOweAsksAndConfirms() async throws {
         let (h, card) = try owedHarness()
         var prompts: [String] = []

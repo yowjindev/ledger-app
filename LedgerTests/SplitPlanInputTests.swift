@@ -82,4 +82,40 @@ final class SplitPlanInputTests: XCTestCase {
         split.setFeeRate(nil, locale: english)
         XCTAssertEqual(split.feeText, "")
     }
+
+    // MARK: Starting with the account's fee
+
+    func testAnAccountWithAFeeStartsAOneMonthSplit() {
+        var split = SplitPlanInput()
+        split.startWithFee(Rate(partsPerMillion: 50_000), locale: english)
+        XCTAssertTrue(split.isOn)
+        XCTAssertEqual(split.months, 1)
+        XCTAssertEqual(split.feeText, "5")
+        split.fillPayment(price: 1_000, locale: english)
+        XCTAssertEqual(split.monthly, 1_050)
+    }
+
+    func testAnAccountWithoutAFeeLeavesSplittingOff() {
+        var split = SplitPlanInput()
+        split.startWithFee(nil, locale: english)
+        XCTAssertFalse(split.isOn)
+        XCTAssertEqual(split, SplitPlanInput())
+    }
+
+    func testSplittingTurnedOffStaysOff() {
+        var split = SplitPlanInput()
+        split.startWithFee(Rate(partsPerMillion: 50_000), locale: english)
+        split.setSplitting(false)
+        split.startWithFee(Rate(partsPerMillion: 50_000), locale: english)
+        XCTAssertFalse(split.isOn)
+        XCTAssertTrue(split.isComplete)
+    }
+
+    func testSplittingAlreadyStartedIsLeftAsChosen() {
+        var split = SplitPlanInput()
+        split.setSplitting(true)
+        split.months = 6
+        split.startWithFee(Rate(partsPerMillion: 50_000), locale: english)
+        XCTAssertEqual(split.months, 6)
+    }
 }

@@ -469,10 +469,41 @@ enum IntentFlows {
         }
 
         let transaction = try IntentLedger.perform {
-            try ledger.record(draft, origin: .appIntent, requestID: UUID())
+            try recordEntry(draft, account: resolved.account, in: ledger)
         }
         Log.intents.info("Recorded a \(draft.kind.rawValue, privacy: .public) from an App Intent")
         return transaction
+    }
+
+    /// Records the entry. On a pay later account that charges a monthly fee, an expense becomes a
+    /// one-month plan with that fee, as it does in the app, and the purchase is returned.
+    private static func recordEntry(_ draft: TransactionDraft, account: Account, in ledger: LedgerService) throws -> LedgerTransaction {
+        guard
+            draft.kind == .expense,
+            account.kind == .payLater,
+            let rate = account.splitFeeRate,
+            let accountID = draft.accountID,
+            let categoryID = draft.categoryID
+        else {
+            return try ledger.record(draft, origin: .appIntent, requestID: UUID())
+        }
+        let plan = try ledger.recordSplitPurchase(
+            SplitPurchase(
+                amount: draft.amount,
+                accountID: accountID,
+                categoryID: categoryID,
+                occurredAt: draft.occurredAt,
+                note: draft.note,
+                months: 1,
+                monthly: LedgerService.splitPayment(price: draft.amount, months: 1, feeRate: rate, currency: account.currency),
+                last: nil
+            ),
+            origin: .appIntent
+        )
+        guard let purchaseID = plan.purchaseID, let purchase = try ledger.transaction(id: purchaseID) else {
+            throw LedgerError.transactionNotFound
+        }
+        return purchase
     }
 
     private static func savedOutcome(for transaction: LedgerTransaction, in ledger: LedgerService) -> IntentOutcome {
@@ -489,6 +520,20 @@ enum IntentFlows {
             subtitle: kind == .transfer ? summary.accountLine : "\(kind.title) · \(summary.accountLine)",
             value: summary.signedAmountText(formatter: formatter)
         )]
+        var details = [detail]
+        // A purchase recorded as a pay later plan shows the fee added with it.
+        if let planID = transaction.planID,
+           let fees = try? ledger.planEntries(planID: planID).first(where: { $0.origin == .planFees }) {
+            let feeSummary = TransactionSummary(fees)
+            details.append(feeSummary.confirmationLine(formatter: formatter))
+            rows.append(ResultRow(
+                id: fees.id,
+                symbolName: feeSummary.symbolName,
+                title: feeSummary.title,
+                subtitle: "\(kind.title) · \(feeSummary.accountLine)",
+                value: feeSummary.signedAmountText(formatter: formatter)
+            ))
+        }
         var balanceLines: [String] = []
         for account in [transaction.account, transaction.destinationAccount].compactMap({ $0 }) {
             guard let balance = sheet?.balance(for: account.id), let current = balance.currentBalance else { continue }
@@ -509,7 +554,7 @@ enum IntentFlows {
         }
         return IntentOutcome(
             headline: "\(kind.title) saved",
-            body: ([detail] + balanceLines).joined(separator: ". "),
+            body: (details + balanceLines).joined(separator: ". "),
             rows: rows
         )
     }

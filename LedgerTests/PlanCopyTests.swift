@@ -16,6 +16,12 @@ final class PlanCopyTests: XCTestCase {
         XCTAssertEqual(PlanCopy.finish(CalendarMonth(year: 2027, month: 1), locale: english), "Last payment Jan 2027")
     }
 
+    func testPlanMonths() {
+        XCTAssertEqual(PlanCopy.planMonths(1), "1× (next month)")
+        XCTAssertEqual(PlanCopy.planMonths(3), "3×")
+        XCTAssertEqual(PlanCopy.planMonths(12), "12×")
+    }
+
     func testSplitSummary() {
         let formatter = fixedFormatter()
         func summary(_ price: Decimal, _ months: Int, _ monthly: Decimal, _ last: Decimal) -> String {

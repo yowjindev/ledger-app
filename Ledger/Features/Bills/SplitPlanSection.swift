@@ -11,6 +11,8 @@ struct SplitPlanInput: Equatable {
     var feeText = ""
     /// Whether the payment was typed rather than filled in from the fee.
     var isPaymentEdited = false
+    /// Whether splitting was turned off by hand, so the account's fee doesn't turn it back on.
+    var isTurnedOff = false
 
     /// Whether the last payment differs from the others. A single payment has no last one.
     var usesDifferentLast: Bool { hasDifferentLast && months > 1 }
@@ -18,6 +20,22 @@ struct SplitPlanInput: Equatable {
     /// Ready to record: split, with the amounts the payments need.
     var isComplete: Bool {
         !isOn || (monthly != nil && (!usesDifferentLast || last != nil))
+    }
+
+    /// Starts a one-month split with the account's fee, since a service that charges one charges it
+    /// even for paying next month. Leaves splitting alone without a fee, once started, or once
+    /// turned off by hand.
+    mutating func startWithFee(_ rate: Rate?, locale: Locale) {
+        guard let rate, !isOn, !isTurnedOff else { return }
+        isOn = true
+        months = 1
+        setFeeRate(rate, locale: locale)
+    }
+
+    /// Turns splitting on or off by hand.
+    mutating func setSplitting(_ isOn: Bool) {
+        self.isOn = isOn
+        isTurnedOff = !isOn
     }
 
     /// Fills in each payment from the price, months, and fee, unless one was typed. Leaves it alone
@@ -80,10 +98,10 @@ struct SplitPlanSection: View {
 
     var body: some View {
         Section {
-            Toggle("Split Into Months", isOn: $input.isOn.animation())
+            Toggle("Payment Plan", isOn: splitting.animation())
             if input.isOn {
                 Stepper(value: $input.months, in: LedgerService.splitMonths) {
-                    LabeledContent("Months", value: "\(input.months)")
+                    LabeledContent("Months", value: PlanCopy.planMonths(input.months))
                 }
                 feeField
                 AmountField("Each Payment", amount: payment, accessibilityLabel: "Each monthly payment")
@@ -101,7 +119,12 @@ struct SplitPlanSection: View {
             if isOn, input.feeText.isEmpty { input.setFeeRate(defaultFeeRate, locale: locale) }
             input.fillPayment(price: price, locale: locale)
         }
+        .onAppear {
+            input.startWithFee(defaultFeeRate, locale: locale)
+            input.fillPayment(price: price, locale: locale)
+        }
         .onChange(of: defaultFeeRate) { _, rate in
+            input.startWithFee(rate, locale: locale)
             input.setFeeRate(rate, locale: locale)
             input.fillPayment(price: price, locale: locale)
         }
@@ -137,6 +160,10 @@ struct SplitPlanSection: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var splitting: Binding<Bool> {
+        Binding(get: { input.isOn }, set: { input.setSplitting($0) })
+    }
+
     /// The payment field's value. Only a changed amount counts as typed, since the field repeats
     /// an amount filled in for it.
     private var payment: Binding<Decimal?> {
@@ -144,7 +171,7 @@ struct SplitPlanSection: View {
     }
 
     private var footer: String {
-        guard input.isOn else { return "Paying next month or in 3, 6, or more months? Split it to track each payment on its due date." }
+        guard input.isOn else { return "Paying next month or in 3, 6, or more months? Turn on Payment Plan to add the service's fee and track each payment on its due date." }
         guard let price, let monthly = input.monthly else {
             if !input.feeText.isEmpty {
                 return "Enter the price above and each payment fills in from the monthly fee. Check it against your pay later app and change it if it differs. Payments start on this account's next due date."
